@@ -1,0 +1,22 @@
+coord sys + perspective
+drawCubeFaces
+first person camera
+texture lib and cube texture
+
+tag v0.1.0
+
+visible 3d array of vectors
+	3d array accesing funcs
+	vector resizing and util funcs
+draw visible and test draw visible
+block data struct
+populate visible
+test
+noiselib
+black mountine side- terain config
+skybox
+
+tag v0.1.1
+
+later: water, block types, trees, move physics, changes
+
