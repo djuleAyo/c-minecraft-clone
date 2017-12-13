@@ -39,6 +39,9 @@ vec3 aim;
 double aimFi;
 double aimTheta;
 
+int mouseX;
+int mouseY;
+
 void getAimVector()
 {
   aim.x = cos(aimTheta) * cos(aimFi);
@@ -199,6 +202,24 @@ keyboard(unsigned char c, int x, int y)
   
 }
 
+void passiveMotion (int x, int y)
+{
+  double delta = .01;
+  
+  int deltaX = mouseX - x;
+  mouseX = x;
+  int deltaY = mouseY - y;
+  mouseY = y;
+
+  aimFi -= deltaX * delta;
+  
+  aimTheta += deltaY * delta;
+  if(aimTheta > PI/ 2) aimTheta = PI / 2;
+  if(aimTheta < - PI / 2) aimTheta = -PI / 2;
+  
+  getAimVector();
+}
+
 void reshape (int w, int h)
 {
    glViewport (0, 0, (GLsizei) w, (GLsizei) h); 
@@ -224,6 +245,9 @@ main (int argc, char **argv)
   aimFi = -PI / 2;
   aimTheta = 0;
 
+  mouseX = 0;
+  mouseY = 0;
+
   
   glutInit(&argc, argv);
 
@@ -232,19 +256,15 @@ main (int argc, char **argv)
   //  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
   glClearColor(0, 0, 0, 0);
 
-  
-
-  glutInitWindowSize(1000, 1000);
-  glutInitWindowPosition(100, 100);
   glutCreateWindow("BlockCraft");
+  glutFullScreen();
 
-  glEnable(GL_DEPTH_TEST);
-  //glEnable(GL_CULL_FACE);
-  glCullFace(GL_FRONT);
-  
+  glutPassiveMotionFunc(passiveMotion);
   glutReshapeFunc(reshape);
   glutDisplayFunc(display);
-  glutKeyboardFunc(keyboard);
+  glutKeyboardFunc(keyboard);  
+
+  glEnable(GL_DEPTH_TEST);
 
   glutMainLoop();
 }
