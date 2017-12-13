@@ -1,7 +1,7 @@
 all: debug production
 
 debug:
-	gcc -o bin/debug -pg -g src/blockcraft.c -lGL -lGLU -lglut
+	gcc -o bin/debug -pg -g src/blockcraft.c -lGL -lGLU -lglut -lm
 
 production:
 	echo "hello production"

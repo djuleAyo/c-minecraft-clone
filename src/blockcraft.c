@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <GL/glut.h>
 #include <sys/time.h>
+#include <math.h>
 
 typedef char cubeFaces;
 #define CUBE_FACE_NONE  0
@@ -11,6 +12,7 @@ typedef char cubeFaces;
 #define CUBE_FACE_DOWN  8
 #define CUBE_FACE_EAST 16
 #define CUBE_FACE_WEST 32
+#define CUBE_FACE_ALL  63
 
 
 typedef struct {
@@ -21,8 +23,28 @@ typedef struct {
 
 typedef worldCoords chunkCoords;
 
+typedef struct {
+  double x;
+  double y;
+  double z;
+} vec3;
 
+const double PI = 3.14159265;
 
+worldCoords testCube;
+
+vec3 pos;
+vec3 aim;
+
+double aimFi;
+double aimTheta;
+
+void getAimVector()
+{
+  aim.x = cos(aimTheta) * cos(aimFi);
+  aim.y = sin(aimTheta);
+  aim.z = cos(aimTheta) * sin(aimFi);
+}
 
 void
 drawCubeFaces(worldCoords *o,  cubeFaces mask)
@@ -72,7 +94,7 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
     glEnd();
   }
   if(mask ^ CUBE_FACE_EAST) {
-    glColor3f(0.0, 0.0, 1.0);
+    glColor3f(1.0, 0.0, 1.0);
     
     glBegin(GL_TRIANGLES);
     glVertex3i(o->x + 1, o->y, o->z);
@@ -85,7 +107,7 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
     glEnd();
   }
   if(mask ^ CUBE_FACE_NORTH) {
-    glColor3f(0.0, 0.0, 1.0);
+    glColor3f(0.0, 1.0, 1.0);
     
     glBegin(GL_TRIANGLES);
     glVertex3i(o->x, o->y, o->z + 1);
@@ -116,24 +138,58 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
 void
 display()
 {
-
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  worldCoords c;
-  c.x = 1;
-  c.y = 1;
-  c.z = 0;
+  getAimVector();
+
+  glLoadIdentity ();          
+  gluLookAt (pos.x, pos.y, pos.z,
+	     pos.x + aim.x,
+	     pos.y + aim.y,
+	     pos.z + aim.z,
+	     0.0, 1.0, 0.0
+	     );
   
-  drawCubeFaces(&c, 63);
+  drawCubeFaces(&testCube, CUBE_FACE_ALL);
+
 
   glutSwapBuffers();
-
+  glutPostRedisplay();
 }
 
 void
 keyboard(unsigned char c, int x, int y)
 {
-  printf("keyboard\n");
+  double delta = .1;
+  
+  switch(c){
+
+  case 'o':
+    pos.x += delta * sin(aimFi);
+    pos.z -= delta * cos(aimFi);
+    break;
+  case 'u':
+    pos.x -= delta * sin(aimFi);
+    pos.z += delta * cos(aimFi);
+    break;
+  case '.':
+    pos.x += delta * aim.x;
+    pos.y += delta * aim.y;
+    pos.z += delta * aim.z;
+    break;
+  case 'e':
+    pos.x -= delta * aim.x;
+    pos.y -= delta * aim.y;
+    pos.z -= delta * aim.z;
+    break;
+  case ' ':
+    pos.y += delta;
+    break;
+  case 'j':
+    pos.y -= delta;
+    break;
+  }
+  
 }
 
 void reshape (int w, int h)
@@ -148,26 +204,36 @@ void reshape (int w, int h)
 int
 main (int argc, char **argv)
 {
+
+  testCube.x = 0;
+  testCube.y = -1;
+  testCube.z = -2;
+
+
+  pos.x = 0;
+  pos.y = 0;
+  pos.z = -5;
+
+  aimFi = PI / 2;
+  aimTheta = 0;
+
+  
   glutInit(&argc, argv);
 
+  //set some states
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+  //  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
+  glClearColor(0, 0, 0, 0);
+  glEnable(GL_DEPTH_TEST);
   
+
   glutInitWindowSize(1000, 1000);
   glutInitWindowPosition(100, 100);
   glutCreateWindow("BlockCraft");
 
-
-  glClearColor(0, 0, 0, 0);
-
-  glutDisplayFunc(display);
   glutReshapeFunc(reshape);
+  glutDisplayFunc(display);
   glutKeyboardFunc(keyboard);
 
-  glLoadIdentity ();             /* clear the matrix */
-  /* viewing transformation  */
-  gluLookAt (0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-
-  glEnable(GL_DEPTH_TEST);
-  
   glutMainLoop();
 }
