@@ -1,7 +1,9 @@
-coord sys + perspective
-drawCubeFaces
-first person camera
+coord sys + perspective			done
+drawCubeFaces				done
+first person camera			
 texture lib and cube texture
+
+note: given gameplay- fpc is not funtion of realtime in this iteration
 
 tag v0.1.0
 
