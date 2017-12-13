@@ -67,6 +67,7 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
     glVertex3i(o->x, o->y + 1, o->z + 1);
     glEnd();
   }
+  
   if(mask ^ CUBE_FACE_DOWN) {
     glColor3f(1.0, 1.0, 0.0);
     
@@ -118,7 +119,7 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
     glVertex3i(o->x + 1, o->y + 1, o->z + 1);
     glVertex3i(o->x, o->y + 1, o->z + 1);
     glEnd();
-  }
+    }
   if(mask ^ CUBE_FACE_SOUTH) {
     glColor3f(0.0, 0.0, 1.0);
     
@@ -132,15 +133,22 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
     glVertex3i(o->x, o->y + 1, o->z);
     glEnd();
   }
+  
 }
 
 
 void
 display()
 {
+
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+  
+
   getAimVector();
+
+  drawCubeFaces(&testCube, CUBE_FACE_ALL);
+
 
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
@@ -150,9 +158,8 @@ display()
 	     0.0, 1.0, 0.0
 	     );
   
-  drawCubeFaces(&testCube, CUBE_FACE_ALL);
 
-
+  
   glutSwapBuffers();
   glutPostRedisplay();
 }
@@ -206,15 +213,15 @@ main (int argc, char **argv)
 {
 
   testCube.x = 0;
-  testCube.y = -1;
-  testCube.z = -2;
+  testCube.y = 0;
+  testCube.z = 0;
 
 
   pos.x = 0;
   pos.y = 0;
-  pos.z = -5;
+  pos.z = 3;
 
-  aimFi = PI / 2;
+  aimFi = -PI / 2;
   aimTheta = 0;
 
   
@@ -224,13 +231,17 @@ main (int argc, char **argv)
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
   //  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
   glClearColor(0, 0, 0, 0);
-  glEnable(GL_DEPTH_TEST);
+
   
 
   glutInitWindowSize(1000, 1000);
   glutInitWindowPosition(100, 100);
   glutCreateWindow("BlockCraft");
 
+  glEnable(GL_DEPTH_TEST);
+  //glEnable(GL_CULL_FACE);
+  glCullFace(GL_FRONT);
+  
   glutReshapeFunc(reshape);
   glutDisplayFunc(display);
   glutKeyboardFunc(keyboard);
