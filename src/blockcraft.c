@@ -4,6 +4,8 @@
 #include <sys/time.h>
 #include <math.h>
 
+#include "keyStore.h"
+
 typedef char cubeFaces;
 #define CUBE_FACE_NONE  0
 #define CUBE_FACE_NORTH 1
@@ -13,6 +15,7 @@ typedef char cubeFaces;
 #define CUBE_FACE_EAST 16
 #define CUBE_FACE_WEST 32
 #define CUBE_FACE_ALL  63
+
 
 
 typedef struct {
@@ -41,6 +44,9 @@ double aimTheta;
 
 int mouseX;
 int mouseY;
+
+int windowW;
+int windowH;
 
 void getAimVector()
 {
@@ -171,7 +177,11 @@ void
 keyboard(unsigned char c, int x, int y)
 {
   double delta = .1;
-  
+
+  press(c);
+  keyTablePrint();
+
+/*
   switch(c){
 
   case 'o':
@@ -199,11 +209,24 @@ keyboard(unsigned char c, int x, int y)
     pos.y -= delta;
     break;
   }
-  
+*/
+}
+
+void
+keyboardUp(unsigned char c, int x, int y)
+{
+  release(c);
+keyTablePrint(); 
 }
 
 void passiveMotion (int x, int y)
 {
+  if(x == windowW / 2 && y == windowH / 2){
+    mouseX = x;
+    mouseY = y;
+    return;
+  }
+  
   double delta = .01;
   
   int deltaX = mouseX - x;
@@ -216,17 +239,31 @@ void passiveMotion (int x, int y)
   aimTheta += deltaY * delta;
   if(aimTheta > PI/ 2) aimTheta = PI / 2;
   if(aimTheta < - PI / 2) aimTheta = -PI / 2;
+
+  glutWarpPointer(windowW / 2, windowH / 2);
   
   getAimVector();
 }
 
 void reshape (int w, int h)
 {
-   glViewport (0, 0, (GLsizei) w, (GLsizei) h); 
-   glMatrixMode (GL_PROJECTION);
-   glLoadIdentity ();
-   glFrustum (-1.0, 1.0, -1.0, 1.0, 1.0, 20.0);
-   glMatrixMode (GL_MODELVIEW);
+  windowW = w;
+  windowH = h;
+  
+  glViewport (0, 0, (GLsizei) w, (GLsizei) h); 
+  glMatrixMode (GL_PROJECTION);
+  glLoadIdentity ();
+  glFrustum (-1.0, 1.0, -1.0, 1.0, 1.0, 20.0);
+  glMatrixMode (GL_MODELVIEW);
+
+  printf("%d %d\n", windowW, windowH);
+
+  glutWarpPointer(w / 2, h / 2);
+  aimFi = -PI / 2;
+  aimTheta = 0;
+
+  getAimVector();
+  
 }
 
 int
@@ -242,9 +279,6 @@ main (int argc, char **argv)
   pos.y = 0;
   pos.z = 3;
 
-  aimFi = -PI / 2;
-  aimTheta = 0;
-
   mouseX = 0;
   mouseY = 0;
 
@@ -253,16 +287,18 @@ main (int argc, char **argv)
 
   //set some states
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-  //  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
+  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
   glClearColor(0, 0, 0, 0);
 
   glutCreateWindow("BlockCraft");
   glutFullScreen();
+  glutSetCursor(GLUT_CURSOR_NONE);
 
   glutPassiveMotionFunc(passiveMotion);
   glutReshapeFunc(reshape);
   glutDisplayFunc(display);
-  glutKeyboardFunc(keyboard);  
+  glutKeyboardFunc(keyboard);
+glutKeyboardUpFunc(keyboardUp);
 
   glEnable(GL_DEPTH_TEST);
 

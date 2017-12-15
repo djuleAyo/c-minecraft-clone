@@ -2,8 +2,8 @@ coord sys + perspective			done
 drawCubeFaces				done
 first person camera
       mouse mov				done
-      input table			
-      mouse bounding
+      input table			done
+      mouse bounding			done
 texture lib and cube texture
 
 note: given gameplay- fpc is not funtion of realtime in this iteration
