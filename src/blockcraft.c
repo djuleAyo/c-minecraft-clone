@@ -3,6 +3,7 @@
 #include <GL/glut.h>
 #include <sys/time.h>
 #include <math.h>
+#include <assert.h>
 
 #include "keyStore.h"
 
@@ -17,6 +18,7 @@ typedef char cubeFaces;
 #define CUBE_FACE_ALL  63
 
 
+#define timeDif(x, y) (x.tv_sec - y.tv_sec) * 1000000 + x.tv_usec - y.tv_usec
 
 typedef struct {
   int x;
@@ -47,6 +49,14 @@ int mouseY;
 
 int windowW;
 int windowH;
+
+int refreshRate = 0;
+double minFR = 0;
+double maxFR = 0;
+double avrFR = 0;
+
+struct timeval frameStart;
+struct timeval frameEnd;
 
 void getAimVector()
 {
@@ -149,15 +159,12 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
 void
 display()
 {
-
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+  assert(gettimeofday(&frameStart, NULL) == 0);
   
-
   getAimVector();
 
   drawCubeFaces(&testCube, CUBE_FACE_ALL);
-
 
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
@@ -167,8 +174,16 @@ display()
 	     0.0, 1.0, 0.0
 	     );
   
+  refreshRate++;
 
-  
+  assert(gettimeofday(&frameEnd, NULL) == 0);
+  int frameRate = timeDif(frameEnd, frameStart);
+
+  if(maxFR < frameRate) maxFR = frameRate;
+  if(!minFR) minFR = frameRate;
+  else if(minFR > frameRate) minFR = frameRate;
+  avrFR = (avrFR * (refreshRate - 1) + refreshRate) / refreshRate;
+
   glutSwapBuffers();
   glutPostRedisplay();
 }
@@ -266,6 +281,20 @@ void reshape (int w, int h)
   
 }
 
+void showRefreshRate(int value)
+{
+  printf("rr %d\n", refreshRate);
+  refreshRate = 0;
+
+  printf("fr:\nmin: %f\nmax: %f\navr: %f\n\n", minFR, maxFR, avrFR);
+
+  minFR = 0;
+  maxFR = 0;
+  avrFR = 0;
+  
+  glutTimerFunc(1000, showRefreshRate, 0);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -298,7 +327,8 @@ main (int argc, char **argv)
   glutReshapeFunc(reshape);
   glutDisplayFunc(display);
   glutKeyboardFunc(keyboard);
-glutKeyboardUpFunc(keyboardUp);
+  glutKeyboardUpFunc(keyboardUp);
+  glutTimerFunc(1000, showRefreshRate, 0);
 
   glEnable(GL_DEPTH_TEST);
 
