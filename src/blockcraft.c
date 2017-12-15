@@ -258,7 +258,7 @@ display()
   if(maxFR < frameRate) maxFR = frameRate;
   if(!minFR) minFR = frameRate;
   else if(minFR > frameRate) minFR = frameRate;
-  avrFR = (avrFR * (refreshRate - 1) + refreshRate) / refreshRate;
+  avrFR = (avrFR * (refreshRate - 1) + frameRate) / refreshRate;
 
   glutSwapBuffers();
   glutPostRedisplay();
@@ -270,15 +270,12 @@ keyboard(unsigned char c, int x, int y)
   double delta = .1;
 
   press(c);
-  keyTablePrint();
-
 }
 
 void
 keyboardUp(unsigned char c, int x, int y)
 {
   release(c);
-keyTablePrint(); 
 }
 
 void passiveMotion (int x, int y)
