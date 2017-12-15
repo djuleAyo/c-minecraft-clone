@@ -1,6 +1,6 @@
 coord sys + perspective			done
 drawCubeFaces				done
-first person camera
+first person camera			done
       mouse mov				done
       input table			done
       mouse bounding			done

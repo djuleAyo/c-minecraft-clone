@@ -6,6 +6,7 @@
 typedef struct keyEnt_ {
   struct timeval start;
   struct timeval end;
+  struct timeval touch;
   struct keyEnt_ *next;
   char c;
 } keyEnt;

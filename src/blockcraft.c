@@ -34,6 +34,15 @@ typedef struct {
   double z;
 } vec3;
 
+typedef enum {
+  ACTION_MOV_FORWARD,
+  ACTION_MOV_BACK,
+  ACTION_MOV_LEFT,
+  ACTION_MOV_RIGHT,
+  ACTION_MOV_UP,
+  ACTION_MOV_DOWN
+} action;
+
 const double PI = 3.14159265;
 
 worldCoords testCube;
@@ -57,6 +66,8 @@ double avrFR = 0;
 
 struct timeval frameStart;
 struct timeval frameEnd;
+
+double delta = .01;
 
 void getAimVector()
 {
@@ -155,15 +166,80 @@ drawCubeFaces(worldCoords *o,  cubeFaces mask)
   
 }
 
+void movForward()
+{
+  pos.x += delta * aim.x;
+  pos.y += delta * aim.y;
+  pos.z += delta * aim.z;
+}
+void movBack()
+{
+  pos.x -= delta * aim.x;
+  pos.y -= delta * aim.y;
+  pos.z -= delta * aim.z;
+}
+void movLeft()
+{
+  pos.x += delta * sin(aimFi);
+  pos.z -= delta * cos(aimFi);
+}
+void movRight()
+{
+  pos.x -= delta * sin(aimFi);
+  pos.z += delta * cos(aimFi);
+}
+void movUp()
+{
+  pos.y += delta;
+}
+void movDown()
+{
+  pos.y -= delta;
+}
+
+void callKeyActions()
+{
+  keyEnt *i = keyTable;
+
+  while (i) {
+
+    switch(i->c){
+    case '.':
+      movForward();
+      break;
+    case 'e':
+      movBack();
+      break;
+    case 'o':
+      movLeft();
+      break;
+    case 'u':
+      movRight();
+      break;
+    case ' ':
+      movUp();
+      break;
+    case 'j':
+      movDown();
+      break;
+
+    }
+    
+    i = i->next;
+  }
+}
 
 void
 display()
 {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  assert(gettimeofday(&frameStart, NULL) == 0);
-  
-  getAimVector();
 
+  assert(gettimeofday(&frameStart, NULL) == 0);
+
+  //process user input
+  getAimVector();
+  callKeyActions();
+  
   drawCubeFaces(&testCube, CUBE_FACE_ALL);
 
   glLoadIdentity ();          
@@ -196,35 +272,6 @@ keyboard(unsigned char c, int x, int y)
   press(c);
   keyTablePrint();
 
-/*
-  switch(c){
-
-  case 'o':
-    pos.x += delta * sin(aimFi);
-    pos.z -= delta * cos(aimFi);
-    break;
-  case 'u':
-    pos.x -= delta * sin(aimFi);
-    pos.z += delta * cos(aimFi);
-    break;
-  case '.':
-    pos.x += delta * aim.x;
-    pos.y += delta * aim.y;
-    pos.z += delta * aim.z;
-    break;
-  case 'e':
-    pos.x -= delta * aim.x;
-    pos.y -= delta * aim.y;
-    pos.z -= delta * aim.z;
-    break;
-  case ' ':
-    pos.y += delta;
-    break;
-  case 'j':
-    pos.y -= delta;
-    break;
-  }
-*/
 }
 
 void
