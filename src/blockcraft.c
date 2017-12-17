@@ -75,7 +75,7 @@ double avrFR = 0;
 struct timeval frameStart;
 struct timeval frameEnd;
 
-double delta = .05;
+double delta = .1;
 
 //this is in chunks
 int visibility = 10;
@@ -114,28 +114,29 @@ VBV *VBVmake()
   return new;
 }
 
-void delVBV(VBV *v)
+void VBVdel(VBV *v)
 {
   free(v->data);
   free(v);
 }
 
-void shrinkVBV(VBV *v)
+void VBVshrink(VBV *v)
 {
   if(v->volume == INITIAL_VBV_VOLUME) return;
 
   v->volume /= 2;
   v->length = v->length > v->volume ? v->volume : v->length;
 
-  v->data = realloc(v->data, v->volume);
+  v->data = realloc(v->data, v->volume * sizeof(visibleBlock));
 
   assert(v->data);
 }
 
-void expandVBV(VBV *v)
+void VBVexpand(VBV *v)
 {
   v->volume *= 2;
-  v->data = realloc(v->data, v->volume);
+
+  v->data =  realloc(v->data, v->volume * sizeof(visibleBlock));
 
   assert(v->data);
 }
@@ -143,11 +144,10 @@ void expandVBV(VBV *v)
 void VBVadd(VBV *v, int x, int y, int z, blockType type, int faces)
 {
   if(v->length == v->volume)
-    expandVBV(v);
+    VBVexpand(v);
 
   visibleBlock *b =
-    &(v->data[v->length]);
-  v->length++;
+    &(v->data[v->length++]);
 
   b->coords.x = x;
   b->coords.y = y;
@@ -163,12 +163,52 @@ void VBVprint(VBV *v)
     return;
   }
   for(int i = 0; i < v->length; i++){
-    visibleBlock b = v->data[i];
-    printf("%d,%d,%d %d\n", b.coords.x, b.coords.y, b.coords.z, b.visibleFaces);
+    visibleBlock *b = &(v->data[i]);
+    printf("%d%d%d%d\n",b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
   }
 }
 
 VBV *v;
+
+int isCached(int x, int y, int z)
+{
+  //dummy
+  if(x > 15 || x < 0 || y > 255 || y < 0 || z > 15 || z < 0)
+    return 0;
+
+  return 1;
+}
+
+blockType readCacheBlock(int x, int y, int z)
+{
+  //dummy
+  return testChunk[x + y * 16 + z * 16 * 256];
+}
+
+void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
+{
+  for(int i = 0; i < 16; i++)
+    for(int j = 0; j < 256; j++)
+      for(int k = 0; k < 16; k++){
+	short faces = 0;
+	if(!isCached(i - 1, j, k) || !readCacheBlock(i - 1, j, k))
+	  faces |= CUBE_FACE_WEST;
+	if(!isCached(i + 1, j, k) || !readCacheBlock(i + 1, j, k))
+	  faces |= CUBE_FACE_EAST;
+	if(!isCached(i, j - 1, k) || !readCacheBlock(i, j - 1, k))
+	  faces |= CUBE_FACE_DOWN;
+	if(!isCached(i, j + 1, k) || !readCacheBlock(i, j + 1, k))
+	  faces |= CUBE_FACE_UP;
+	if(!isCached(i, j, k - 1) || !readCacheBlock(i, j, k - 1))
+	  faces |= CUBE_FACE_SOUTH;
+	if(!isCached(i, j, k + 1) || !readCacheBlock(i, j, k + 1))
+	  faces |= CUBE_FACE_NORTH;
+
+	if(faces){
+	  VBVadd(v, i, j, k, BLOCK_TYPE_SOIL, faces);
+	}
+      }
+}
 
 chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
 
@@ -343,13 +383,20 @@ display()
   //process user input
   getAimVector();
   callKeyActions();
-  
-  for(int i = 0; i < v->length; i++){
-    visibleBlock b = v->data[i];
-    drawCubeFaces(b.coords.x, b.coords.y, b.coords.z, b.visibleFaces);
-  }
-   
 
+  /*
+  for(int x = 0; x < CHUNK_DIM; x++)
+    for(int y = 0; y < MAX_HEIGHT; y++)
+      for(int z = 0; z < CHUNK_DIM; z++)
+	drawCubeFaces(x, y, z, CUBE_FACE_ALL);
+  */	    
+
+  for(int i = 0; i < v->length; i++) {
+    visibleBlock *b = &(v->data[i]);
+    drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+  }
+ 
+  
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
 	     pos.x + aim.x,
@@ -423,8 +470,6 @@ void reshape (int w, int h)
   gluPerspective(60, w / (float) h, 1, 200);
   glMatrixMode (GL_MODELVIEW);
 
-  printf("%d %d\n", windowW, windowH);
-
   glutWarpPointer(w / 2, h / 2);
   aimFi = -PI / 2;
   aimTheta = 0;
@@ -466,12 +511,12 @@ main (int argc, char **argv)
     }
   */
   for(int x = 0; x < 16; x++){
-    for(int y = 0; y < 16; y++){
+    for(int y = 0; y < 256; y++){
       for(int z = 0; z < 16; z++){
-	if(y % 2 == 0)
-	  testChunk[x + y * 16 + z * 16 * 16] = BLOCK_TYPE_SOIL;
-	else
-	  testChunk[x + y * 16 + z * 16 * 16] = BLOCK_TYPE_AIR;
+	//if(y % 2 == 0)
+	  testChunk[x + y * 16 + z * 256* 16] = BLOCK_TYPE_SOIL;
+	  //	else
+	  //x	  testChunk[x + y * 16 + z * 256 * 16] = BLOCK_TYPE_AIR;
       }
     }
   }
@@ -484,11 +529,7 @@ main (int argc, char **argv)
   mouseY = 0;
 
   v = VBVmake();
-  for(int i = 0; i < 16; i++)
-    for(int j = 0; j < 16; j++)
-      VBVadd(v, i, 2, j, BLOCK_TYPE_SOIL, CUBE_FACE_UP);
-  printf("len %d\n", v->length);
-  VBVprint(v);
+  chunkToVBV(0, 0, 0, &testChunk, v);
   
   glutInit(&argc, argv);
 
