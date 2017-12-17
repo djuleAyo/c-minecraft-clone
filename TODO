@@ -9,6 +9,8 @@ texture lib and cube texture
 
 note: given gameplay- fpc is not funtion of realtime in this iteration
 
+preview vid
+
 tag v0.1.0
 
 visible 3d array of vectors
@@ -16,6 +18,7 @@ visible 3d array of vectors
 	vector resizing and util funcs
 draw visible and test draw visible
 block data struct
+populate block data
 populate visible
 test
 noiselib
@@ -24,5 +27,5 @@ skybox
 
 tag v0.1.1
 
-later: water, block types, trees, move physics, changes
+later: water, block types, trees, move physics, changes, items and building
 
