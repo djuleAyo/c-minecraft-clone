@@ -78,7 +78,7 @@ struct timeval frameEnd;
 double delta = 1;
 
 //this is in chunks
-int visibility = 10;
+int visibility = 5;
 
 #define MAX_HEIGHT 256
 #define CHUNK_DIM 16
@@ -435,7 +435,14 @@ display()
       }
       
     }
-  
+
+
+  /*
+  for(int i = 0; i < 30; i++)
+    for(int j = 0; j < 100; j++)
+      for(int k = 0; k < 100; k++)
+	drawCubeFaces(i, j, k, CUBE_FACE_UP);
+  */
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
 	     pos.x + aim.x,
@@ -589,7 +596,7 @@ main (int argc, char **argv)
       for(int x = 0; x < CHUNK_DIM; x++)
 	for(int y = 0; y < MAX_HEIGHT; y++)
 	  for(int z = 0; z < CHUNK_DIM; z++)
-	    if(y <= 2)
+	    if(y <= 2 && x % 2 == 0)
 	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
 	    else
 	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
