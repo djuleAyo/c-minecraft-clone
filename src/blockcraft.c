@@ -75,7 +75,7 @@ double avrFR = 0;
 struct timeval frameStart;
 struct timeval frameEnd;
 
-double delta = .1;
+double delta = 1;
 
 //this is in chunks
 int visibility = 10;
@@ -170,19 +170,44 @@ void VBVprint(VBV *v)
 
 VBV *v;
 
+
+
+chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
+worldCoords bdwo; // block data world origin
+worldCoords bdmo; // block data memory origin
+
+
 int isCached(int x, int y, int z)
 {
-  //dummy
-  if(x > 15 || x < 0 || y > 255 || y < 0 || z > 15 || z < 0)
-    return 0;
+  if(x < bdwo.x || x >= bdwo.x + 2 * visibility * CHUNK_DIM) return 0;
+  if(y < bdwo.y || y >= bdwo.y + 2 * visibility * CHUNK_DIM) return 0;
+  if(z < bdwo.z || z >= bdwo.z + 2 * visibility * CHUNK_DIM) return 0;
 
   return 1;
 }
 
 blockType readCacheBlock(int x, int y, int z)
 {
-  //dummy
-  return testChunk[x + y * 16 + z * 16 * 256];
+  worldCoords delta;
+  delta.x = x - bdwo.x;
+  delta.y = y - bdwo.y;
+  delta.z = z - bdwo.z;
+
+  /*
+ printf("read cache block\n");
+
+ printf("for x %d , y %d, z %d checking out %d %d chunk and %d %d %d block\n",
+	x, y, z,
+	delta.x / CHUNK_DIM, delta.z / CHUNK_DIM * 2 * visibility,
+	delta.x % CHUNK_DIM,
+	delta.y * CHUNK_DIM,
+	(delta.z % CHUNK_DIM) * CHUNK_DIM * MAX_HEIGHT);
+  */
+ return (blockData[(delta.x / CHUNK_DIM) + (delta.z / CHUNK_DIM) * 2 * visibility])
+    [(delta.x % CHUNK_DIM)
+     + (delta.y) * CHUNK_DIM
+     + (delta.z % CHUNK_DIM) * CHUNK_DIM * MAX_HEIGHT];
+  
 }
 
 void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
@@ -190,18 +215,19 @@ void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
   for(int i = 0; i < 16; i++)
     for(int j = 0; j < 256; j++)
       for(int k = 0; k < 16; k++){
+	if(!(*c)[i + j * 16 + k * 16 * 256]) continue;
 	short faces = 0;
-	if(!isCached(i - 1, j, k) || !readCacheBlock(i - 1, j, k))
+	if(isCached(i - 1, j, k) && !readCacheBlock(i - 1, j, k))
 	  faces |= CUBE_FACE_WEST;
-	if(!isCached(i + 1, j, k) || !readCacheBlock(i + 1, j, k))
+	if(isCached(i + 1, j, k) && !readCacheBlock(i + 1, j, k))
 	  faces |= CUBE_FACE_EAST;
-	if(!isCached(i, j - 1, k) || !readCacheBlock(i, j - 1, k))
+	if(isCached(i, j - 1, k) && !readCacheBlock(i, j - 1, k))
 	  faces |= CUBE_FACE_DOWN;
-	if(!isCached(i, j + 1, k) || !readCacheBlock(i, j + 1, k))
+	if(isCached(i, j + 1, k) && !readCacheBlock(i, j + 1, k))
 	  faces |= CUBE_FACE_UP;
-	if(!isCached(i, j, k - 1) || !readCacheBlock(i, j, k - 1))
+	if(isCached(i, j, k - 1) && !readCacheBlock(i, j, k - 1))
 	  faces |= CUBE_FACE_SOUTH;
-	if(!isCached(i, j, k + 1) || !readCacheBlock(i, j, k + 1))
+	if(isCached(i, j, k + 1) && !readCacheBlock(i, j, k + 1))
 	  faces |= CUBE_FACE_NORTH;
 
 	if(faces){
@@ -210,8 +236,7 @@ void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
       }
 }
 
-chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
-
+VBV **vbd; // visible block data
 
 void getAimVector()
 {
@@ -385,17 +410,31 @@ display()
   callKeyActions();
 
   /*
+    //draw chunk
   for(int x = 0; x < CHUNK_DIM; x++)
     for(int y = 0; y < MAX_HEIGHT; y++)
       for(int z = 0; z < CHUNK_DIM; z++)
 	drawCubeFaces(x, y, z, CUBE_FACE_ALL);
-  */	    
 
+  */
+  /*
+//draw vbv
   for(int i = 0; i < v->length; i++) {
     visibleBlock *b = &(v->data[i]);
     drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
   }
- 
+  */
+
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++){
+      VBV *v = vbd[i + j * 2 * visibility];
+      for(int x = 0; x < v->length; x++) {
+	visibleBlock *b = &(v->data[x]);
+	drawCubeFaces(b->coords.x + i * CHUNK_DIM, b->coords.y, b->coords.z + j * CHUNK_DIM, b->visibleFaces);
+	//drawCubeFaces(v->data[x].coords.x + i * CHUNK_DIM, v->data[x].coords.y, v->data[x].coords.z + j * CHUNK_DIM, v->data[x].visibleFaces);
+      }
+      
+    }
   
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
@@ -528,8 +567,52 @@ main (int argc, char **argv)
   mouseX = 0;
   mouseY = 0;
 
+  bdwo.x = 0;
+  bdwo.y = 0;
+  bdwo.z = 0;
+
+  
   v = VBVmake();
-  chunkToVBV(0, 0, 0, &testChunk, v);
+  //chunkToVBV(0, 0, 0, &testChunk, v);
+
+
+
+  //for since data for both sides of player is kept
+  //since aim can be changed fast
+  blockData = malloc(sizeof(chunk) * 4 * visibility * visibility);
+  assert(blockData);
+
+  //  initBlockData();
+  printf("initing block data\n");
+  for(int i = 0; i < 2 * visibility; i++){
+    for(int j = 0; j < 2 * visibility; j++){
+      for(int x = 0; x < CHUNK_DIM; x++)
+	for(int y = 0; y < MAX_HEIGHT; y++)
+	  for(int z = 0; z < CHUNK_DIM; z++)
+	    if(y <= 2)
+	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
+	    else
+	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
+    }
+  }
+  printf("block data init finished\n");
+
+  //init vbd memory
+  printf("initing vbd\n");
+  vbd = malloc (sizeof(VBV*) * 4 * visibility * visibility);
+  for(int i = 0; i < 4 * visibility * visibility; i++){
+    vbd[i] = VBVmake();
+  }
+  assert(vbd);
+
+  //init vbd data
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++){
+      chunkToVBV(bdwo.x + i, 0, bdwo.z + j,
+		 &blockData[i + j * 2 * visibility], vbd[i + j * 2 * visibility]);
+      printf("visible blocks in %d %d: %d\n", i, j, vbd[i + j * 2 * visibility]->length);
+    }
+  printf("init vbd finished\n");
   
   glutInit(&argc, argv);
 
@@ -541,7 +624,10 @@ main (int argc, char **argv)
   glutFullScreen();
   glutSetCursor(GLUT_CURSOR_NONE);
   glClearColor(0.25, 0.5, 0.8, 1);
+  //glEnable(GL_CULL_FACE);
+  //glCullFace(GL_BACK);
 
+  
   glutPassiveMotionFunc(passiveMotion);
   glutReshapeFunc(reshape);
   glutDisplayFunc(display);
