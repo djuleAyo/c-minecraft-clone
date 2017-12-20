@@ -5,6 +5,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "perlin.h"
 #include "keyStore.h"
 //#include "SOIL.h"
 
@@ -75,17 +76,16 @@ double avrFR = 0;
 struct timeval frameStart;
 struct timeval frameEnd;
 
-double delta = 1;
+double delta = .5;
 
 //this is in chunks
-int visibility = 5;
+int visibility = 3;
 
 #define MAX_HEIGHT 256
 #define CHUNK_DIM 16
 //blockType testChunk[ 2 * visibility * 2 * visibility * 2 * visibility * CHUNK_DIM * CHUNK_DIM * CHUNK_DIM];
 
 typedef blockType chunk[CHUNK_DIM * CHUNK_DIM * MAX_HEIGHT];
-chunk testChunk;
 
 typedef struct{
   worldCoords coords;
@@ -162,15 +162,13 @@ void VBVprint(VBV *v)
     printf("empty\n");
     return;
   }
+  printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
   for(int i = 0; i < v->length; i++){
     visibleBlock *b = &(v->data[i]);
-    printf("%d%d%d%d\n",b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+    printf("%d\t%d\t%d\t\t%d\n",b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
   }
+  
 }
-
-VBV *v;
-
-
 
 chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
 worldCoords bdwo; // block data world origin
@@ -217,23 +215,38 @@ void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
       for(int k = 0; k < 16; k++){
 	if(!(*c)[i + j * 16 + k * 16 * 256]) continue;
 	short faces = 0;
-	if(isCached(i - 1, j, k) && !readCacheBlock(i - 1, j, k))
+	if(!isCached(oX + i  - 1, j, k + oZ) || !readCacheBlock(oX + i - 1, j, k + oZ))
 	  faces |= CUBE_FACE_WEST;
-	if(isCached(i + 1, j, k) && !readCacheBlock(i + 1, j, k))
+	if(!isCached(oX + i  + 1, j, k + oZ) || !readCacheBlock(oX + i  + 1, j, k + oZ))
 	  faces |= CUBE_FACE_EAST;
-	if(isCached(i, j - 1, k) && !readCacheBlock(i, j - 1, k))
+	if(!isCached(i + oX, oY + j - 1, k + oZ) || !readCacheBlock(i + oX, oY + j - 1, k + oZ))
 	  faces |= CUBE_FACE_DOWN;
-	if(isCached(i, j + 1, k) && !readCacheBlock(i, j + 1, k))
+	if(!isCached(i + oX, j  + 1, k + oZ) || !readCacheBlock(i + oX, j + 1, k + oZ))
 	  faces |= CUBE_FACE_UP;
-	if(isCached(i, j, k - 1) && !readCacheBlock(i, j, k - 1))
+	if(!isCached(i + oX, j, oZ + k  - 1) || !readCacheBlock(i + oX, j, oZ + k  - 1))
 	  faces |= CUBE_FACE_SOUTH;
-	if(isCached(i, j, k + 1) && !readCacheBlock(i, j, k + 1))
+	if(!isCached(i + oX, j, oZ + k  + 1) || !readCacheBlock(i + oX, j, oZ + k  + 1))
 	  faces |= CUBE_FACE_NORTH;
 
 	if(faces){
-	  VBVadd(v, i, j, k, BLOCK_TYPE_SOIL, faces);
+	  VBVadd(v, oX + i, j + oY, k + oZ, BLOCK_TYPE_SOIL, faces);
 	}
       }
+}
+
+void BDprint()
+{
+  for(int x = bdwo.x; x < bdwo.x + 2 * visibility * CHUNK_DIM; x++){
+    printf("\n"); 
+    for(int z = bdwo.z; z < bdwo.z + 2 * visibility * CHUNK_DIM; z++){
+      int h = 0;
+      for(int y = 0; y < MAX_HEIGHT; y++){
+	if(readCacheBlock(x, y, z)) h = y;
+	else break;
+      }
+      printf(" %d ", h);
+    }
+  }
 }
 
 VBV **vbd; // visible block data
@@ -268,7 +281,7 @@ drawCubeFaces(int x, int y, int z,  cubeFaces mask)
   }
   
   if(mask & CUBE_FACE_DOWN) {
-    glColor3f(1.0, 1.0, 0.0);
+    glColor3f(0.0, 0.0, 0.0);
     
     glBegin(GL_TRIANGLES);
     glVertex3i(x, y, z);
@@ -294,7 +307,7 @@ drawCubeFaces(int x, int y, int z,  cubeFaces mask)
     glEnd();
   }
   if(mask & CUBE_FACE_EAST) {
-    glColor3f(1.0, 0.0, 1.0);
+    glColor3f(0.0, 0.0, 1.0);
     
     glBegin(GL_TRIANGLES);
     glVertex3i(x + 1, y, z);
@@ -307,7 +320,7 @@ drawCubeFaces(int x, int y, int z,  cubeFaces mask)
     glEnd();
   }
   if(mask & CUBE_FACE_NORTH) {
-    glColor3f(0.0, 1.0, 1.0);
+    glColor3f(0.0, 1.0, 0.0);
     
     glBegin(GL_TRIANGLES);
     glVertex3i(x, y, z + 1);
@@ -320,7 +333,7 @@ drawCubeFaces(int x, int y, int z,  cubeFaces mask)
     glEnd();
     }
   if(mask & CUBE_FACE_SOUTH) {
-    glColor3f(0.0, 0.0, 1.0);
+    glColor3f(1.0, 0.0, 1.0);
     
     glBegin(GL_TRIANGLES);
     glVertex3i(x, y, z);
@@ -398,6 +411,31 @@ void callKeyActions()
   }
 }
 
+void drawVBD()
+{
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++){
+      VBV *v = vbd[i + j * 2 * visibility];
+      for(int x = 0; x < v->length; x++) {
+	visibleBlock *b = &(v->data[x]);
+	drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+	//drawCubeFaces(v->data[x].coords.x + i * CHUNK_DIM, v->data[x].coords.y, v->data[x].coords.z + j * CHUNK_DIM, v->data[x].visibleFaces);
+      }
+      
+    }
+}
+void drawBD()
+{
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++)
+      for(int x = 0; x < CHUNK_DIM; x++)
+	for(int y = 0; y < MAX_HEIGHT; y++)
+	  for(int z = 0; z < CHUNK_DIM; z++){
+	    if(readCacheBlock(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z))
+	      drawCubeFaces(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z, CUBE_FACE_ALL);      
+	  }
+}
+
 void
 display()
 {
@@ -409,40 +447,9 @@ display()
   getAimVector();
   callKeyActions();
 
-  /*
-    //draw chunk
-  for(int x = 0; x < CHUNK_DIM; x++)
-    for(int y = 0; y < MAX_HEIGHT; y++)
-      for(int z = 0; z < CHUNK_DIM; z++)
-	drawCubeFaces(x, y, z, CUBE_FACE_ALL);
-
-  */
-  /*
-//draw vbv
-  for(int i = 0; i < v->length; i++) {
-    visibleBlock *b = &(v->data[i]);
-    drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
-  }
-  */
-
-  for(int i = 0; i < 2 * visibility; i++)
-    for(int j = 0; j < 2 * visibility; j++){
-      VBV *v = vbd[i + j * 2 * visibility];
-      for(int x = 0; x < v->length; x++) {
-	visibleBlock *b = &(v->data[x]);
-	drawCubeFaces(b->coords.x + i * CHUNK_DIM, b->coords.y, b->coords.z + j * CHUNK_DIM, b->visibleFaces);
-	//drawCubeFaces(v->data[x].coords.x + i * CHUNK_DIM, v->data[x].coords.y, v->data[x].coords.z + j * CHUNK_DIM, v->data[x].visibleFaces);
-      }
-      
-    }
-
-
-  /*
-  for(int i = 0; i < 30; i++)
-    for(int j = 0; j < 100; j++)
-      for(int k = 0; k < 100; k++)
-	drawCubeFaces(i, j, k, CUBE_FACE_UP);
-  */
+  //drawBD();
+  drawVBD();
+  
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
 	     pos.x + aim.x,
@@ -517,7 +524,7 @@ void reshape (int w, int h)
   glMatrixMode (GL_MODELVIEW);
 
   glutWarpPointer(w / 2, h / 2);
-  aimFi = -PI / 2;
+  aimFi = PI / 2;
   aimTheta = 0;
 
   getAimVector();
@@ -538,34 +545,60 @@ void showRefreshRate(int value)
   glutTimerFunc(1000, showRefreshRate, 0);
 }
 
+void BDinit()
+{
+  printf("initing block data\n");
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++)
+      for(int x = 0; x < CHUNK_DIM; x++)
+	for(int z = 0; z < CHUNK_DIM; z++){
+	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
+	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
+
+	  int n = (int)(pnoise2d(worldX / 20.0, worldZ/20.0,
+				 .8, 3, 1) * 10 + 20 );
+	  //printf("%d\t%d\t%d\n", worldX, worldZ, n);
+	  
+	  for(int y = 0; y < MAX_HEIGHT; y++){
+
+	    if( //pow(worldX - 10, 2) + pow(y, 2) + pow(worldZ, 2)  < 100
+	       	y < n
+		){
+	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
+	      printf("%d,%d,%d\t%d\n", worldX, worldZ, y, n);
+	    }
+	    else
+	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
+
+	  }
+	}
+  printf("block data init finished\n");
+}
+
+void VBVinit()
+{
+  printf("initing vbd\n");
+  vbd = malloc (sizeof(VBV*) * 4 * visibility * visibility);
+  for(int i = 0; i < 4 * visibility * visibility; i++){
+    vbd[i] = VBVmake();
+  }
+  assert(vbd);
+
+  //init vbd data
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++){
+      chunkToVBV(bdwo.x + i * CHUNK_DIM , 0, bdwo.z + j * CHUNK_DIM,
+		 &blockData[i + j * 2 * visibility], vbd[i + j * 2 * visibility]);
+      //printf("visible blocks in %d %d: %d\n", i, j, vbd[i + j * 2 * visibility]->length);
+      VBVprint(vbd[i + j * 2 * visibility]);
+    }
+  printf("init vbd finished\n");
+
+}
+
 int
 main (int argc, char **argv)
 {
-  
-  /*
-  GLuint tex_2d = SOIL_load_OGL_texture
-    (
-     "img.png",
-     SOIL_LOAD_AUTO,
-     SOIL_CREATE_NEW_ID,
-     SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-     );
-	
-  if( 0 == tex_2d )
-    {
-      printf( "SOIL loading error: '%s'\n", SOIL_last_result() );
-    }
-  */
-  for(int x = 0; x < 16; x++){
-    for(int y = 0; y < 256; y++){
-      for(int z = 0; z < 16; z++){
-	//if(y % 2 == 0)
-	  testChunk[x + y * 16 + z * 256* 16] = BLOCK_TYPE_SOIL;
-	  //	else
-	  //x	  testChunk[x + y * 16 + z * 256 * 16] = BLOCK_TYPE_AIR;
-      }
-    }
-  }
 
   pos.x = 0;
   pos.y = 0;
@@ -578,10 +611,6 @@ main (int argc, char **argv)
   bdwo.y = 0;
   bdwo.z = 0;
 
-  
-  v = VBVmake();
-  //chunkToVBV(0, 0, 0, &testChunk, v);
-
 
 
   //for since data for both sides of player is kept
@@ -589,37 +618,13 @@ main (int argc, char **argv)
   blockData = malloc(sizeof(chunk) * 4 * visibility * visibility);
   assert(blockData);
 
-  //  initBlockData();
-  printf("initing block data\n");
-  for(int i = 0; i < 2 * visibility; i++){
-    for(int j = 0; j < 2 * visibility; j++){
-      for(int x = 0; x < CHUNK_DIM; x++)
-	for(int y = 0; y < MAX_HEIGHT; y++)
-	  for(int z = 0; z < CHUNK_DIM; z++)
-	    if(y <= 2 && x % 2 == 0)
-	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
-	    else
-	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
-    }
-  }
-  printf("block data init finished\n");
+  BDinit();
 
-  //init vbd memory
-  printf("initing vbd\n");
-  vbd = malloc (sizeof(VBV*) * 4 * visibility * visibility);
-  for(int i = 0; i < 4 * visibility * visibility; i++){
-    vbd[i] = VBVmake();
-  }
-  assert(vbd);
+  BDprint();
+  
+  VBVinit();
+  
 
-  //init vbd data
-  for(int i = 0; i < 2 * visibility; i++)
-    for(int j = 0; j < 2 * visibility; j++){
-      chunkToVBV(bdwo.x + i, 0, bdwo.z + j,
-		 &blockData[i + j * 2 * visibility], vbd[i + j * 2 * visibility]);
-      printf("visible blocks in %d %d: %d\n", i, j, vbd[i + j * 2 * visibility]->length);
-    }
-  printf("init vbd finished\n");
   
   glutInit(&argc, argv);
 

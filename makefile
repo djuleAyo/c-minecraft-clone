@@ -1,7 +1,7 @@
 all: debug production
 
 debug:
-	gcc -Iinclude -Llib -o bin/debug -pg -g src/blockcraft.c src/keyStore.c -lGL -lGLU -lglut -lm
+	gcc -Iinclude -Llib -o bin/debug -pg -g src/blockcraft.c src/keyStore.c src/perlin.c -lGL -lGLU -lglut -lm
 
 production:
 	echo "hello production"
