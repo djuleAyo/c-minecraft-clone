@@ -5,9 +5,10 @@
 #include <math.h>
 #include <assert.h>
 
+#include "lodepng.h"
 #include "perlin.h"
 #include "keyStore.h"
-//#include "SOIL.h"
+#include "SOIL.h"
 
 typedef char cubeFaces;
 #define CUBE_FACE_NONE  0
@@ -79,7 +80,7 @@ struct timeval frameEnd;
 double delta = .5;
 
 //this is in chunks
-int visibility = 3;
+int visibility = 10;
 
 #define MAX_HEIGHT 256
 #define CHUNK_DIM 16
@@ -100,6 +101,28 @@ typedef struct{
 } VBV;
 
 #define INITIAL_VBV_VOLUME 256
+
+
+#define checkImageWidth 64
+#define checkImageHeight 64
+static GLubyte checkImage[checkImageHeight][checkImageWidth][4];
+
+static GLuint texName;
+
+void makeCheckImage(void)
+{
+   int i, j, c;
+    
+   for (i = 0; i < checkImageHeight; i++) {
+      for (j = 0; j < checkImageWidth; j++) {
+         c = ((((i&0x8)==0)^((j&0x8))==0))*255;
+         checkImage[i][j][0] = (GLubyte) c;
+         checkImage[i][j][1] = (GLubyte) c;
+         checkImage[i][j][2] = (GLubyte) c;
+         checkImage[i][j][3] = (GLubyte) 255;
+      }
+   }
+}
 
 VBV *VBVmake()
 {
@@ -215,17 +238,17 @@ void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
       for(int k = 0; k < 16; k++){
 	if(!(*c)[i + j * 16 + k * 16 * 256]) continue;
 	short faces = 0;
-	if(!isCached(oX + i  - 1, j, k + oZ) || !readCacheBlock(oX + i - 1, j, k + oZ))
+	if(isCached(oX + i  - 1, j, k + oZ) && !readCacheBlock(oX + i - 1, j, k + oZ))
 	  faces |= CUBE_FACE_WEST;
-	if(!isCached(oX + i  + 1, j, k + oZ) || !readCacheBlock(oX + i  + 1, j, k + oZ))
+	if(isCached(oX + i  + 1, j, k + oZ) && !readCacheBlock(oX + i  + 1, j, k + oZ))
 	  faces |= CUBE_FACE_EAST;
-	if(!isCached(i + oX, oY + j - 1, k + oZ) || !readCacheBlock(i + oX, oY + j - 1, k + oZ))
+	if(isCached(i + oX, oY + j - 1, k + oZ) && !readCacheBlock(i + oX, oY + j - 1, k + oZ))
 	  faces |= CUBE_FACE_DOWN;
-	if(!isCached(i + oX, j  + 1, k + oZ) || !readCacheBlock(i + oX, j + 1, k + oZ))
+	if(isCached(i + oX, j  + 1, k + oZ) && !readCacheBlock(i + oX, j + 1, k + oZ))
 	  faces |= CUBE_FACE_UP;
-	if(!isCached(i + oX, j, oZ + k  - 1) || !readCacheBlock(i + oX, j, oZ + k  - 1))
+	if(isCached(i + oX, j, oZ + k  - 1) && !readCacheBlock(i + oX, j, oZ + k  - 1))
 	  faces |= CUBE_FACE_SOUTH;
-	if(!isCached(i + oX, j, oZ + k  + 1) || !readCacheBlock(i + oX, j, oZ + k  + 1))
+	if(isCached(i + oX, j, oZ + k  + 1) && !readCacheBlock(i + oX, j, oZ + k  + 1))
 	  faces |= CUBE_FACE_NORTH;
 
 	if(faces){
@@ -266,83 +289,66 @@ drawCubeFaces(int x, int y, int z,  cubeFaces mask)
   // minimal set of vert coord values for given cube is positive quartespace
   // meaning the south-west-down corner
   if(!mask) return;
-  if(mask & CUBE_FACE_UP) {
-    glColor3f(1.0, 1.0, 1.0);
-    
-    glBegin(GL_TRIANGLES);
-    glVertex3i(x, y + 1, z);
-    glVertex3i(x + 1, y + 1, z);
-    glVertex3i(x + 1, y + 1, z + 1);
 
-    glVertex3i(x, y + 1, z);
-    glVertex3i(x + 1, y + 1, z + 1);
-    glVertex3i(x, y + 1, z + 1);
+  if(mask & CUBE_FACE_UP) {
+    glColor3f(.0, 1.0, .0);
+
+    glBegin(GL_QUADS);
+    glTexCoord2f(8 * 1.0 / 16, 4 * 1.0 / 16); glVertex3i(x, y + 1, z);
+    glTexCoord2f(8 * 1.0 / 16, 5 * 1.0 / 16); glVertex3i(x + 1, y + 1, z);
+    glTexCoord2f(9 * 1.0 / 16, 5 * 1.0 / 16); glVertex3i(x + 1, y + 1, z + 1);
+    glTexCoord2f(9 * 1.0 / 16, 4 * 1.0 / 16); glVertex3i(x, y + 1, z + 1);
     glEnd();
   }
   
   if(mask & CUBE_FACE_DOWN) {
-    glColor3f(0.0, 0.0, 0.0);
+    glColor3f(1, 1, 1);
     
-    glBegin(GL_TRIANGLES);
-    glVertex3i(x, y, z);
-    glVertex3i(x + 1, y, z);
-    glVertex3i(x + 1, y, z + 1);
-
-    glVertex3i(x, y, z);
-    glVertex3i(x + 1, y, z + 1);
-    glVertex3i(x, y, z + 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0, 0.0); glVertex3i(x, y, z);
+    glTexCoord2f(0.0, 1.0 / 16); glVertex3i(x + 1, y, z);
+    glTexCoord2f(1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z + 1);
+    glTexCoord2f(1.0 / 16, 0.0); glVertex3i(x, y, z + 1);
     glEnd();
   }
   if(mask & CUBE_FACE_WEST) {
-    glColor3f(1.0, 0.0, 0.0);
+    glColor3f(1, 1, 1);
     
-    glBegin(GL_TRIANGLES);
-    glVertex3i(x, y, z);
-    glVertex3i(x, y + 1, z);
-    glVertex3i(x, y + 1, z + 1);
-
-    glVertex3i(x, y, z);
-    glVertex3i(x, y + 1, z + 1);
-    glVertex3i(x, y, z + 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z);
+    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x, y + 1, z);
+    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x, y + 1, z + 1);
+    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z + 1);
     glEnd();
   }
   if(mask & CUBE_FACE_EAST) {
-    glColor3f(0.0, 0.0, 1.0);
+    glColor3f(.5, .5, .5);
     
-    glBegin(GL_TRIANGLES);
-    glVertex3i(x + 1, y, z);
-    glVertex3i(x + 1, y + 1, z);
-    glVertex3i(x + 1, y + 1, z + 1);
-
-    glVertex3i(x + 1, y, z);
-    glVertex3i(x + 1, y + 1, z + 1);
-    glVertex3i(x + 1, y, z + 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z);
+    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z);
+    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z + 1);
+    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z + 1);
     glEnd();
   }
   if(mask & CUBE_FACE_NORTH) {
-    glColor3f(0.0, 1.0, 0.0);
+    glColor3f(3 * 1.0 / 16, 1.0 / 16, 3 * 1.0 / 16);
     
-    glBegin(GL_TRIANGLES);
-    glVertex3i(x, y, z + 1);
-    glVertex3i(x + 1, y, z + 1);
-    glVertex3i(x + 1, y + 1, z + 1);
-
-    glVertex3i(x, y, z + 1);
-    glVertex3i(x + 1, y + 1, z + 1);
-    glVertex3i(x, y + 1, z + 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z + 1);
+    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z + 1);
+    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z + 1);
+    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x, y + 1, z + 1);
     glEnd();
     }
   if(mask & CUBE_FACE_SOUTH) {
-    glColor3f(1.0, 0.0, 1.0);
+    glColor3f(1.0 / 16, 3 * 1.0 / 16, 1.0 / 16);
     
-    glBegin(GL_TRIANGLES);
-    glVertex3i(x, y, z);
-    glVertex3i(x + 1, y, z);
-    glVertex3i(x + 1, y + 1, z);
-
-    glVertex3i(x, y, z);
-    glVertex3i(x + 1, y + 1, z);
-    glVertex3i(x, y + 1, z);
+    glBegin(GL_QUADS);
+    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z);
+    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z);
+    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z);
+    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x, y + 1, z);
     glEnd();
   }
   
@@ -436,6 +442,40 @@ void drawBD()
 	  }
 }
 
+unsigned texPackW;
+unsigned texPackH;
+
+static GLuint texPack;
+
+void decodeOneStep(const char* filename)
+{
+  unsigned error;
+  unsigned char* image;
+  unsigned width, height;
+
+  error = lodepng_decode32_file(&image, &texPackW, &texPackH, filename);
+  if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
+
+  printf("loaded texture pack\n");
+
+
+  glGenTextures(1, &texPack);
+  glBindTexture(GL_TEXTURE_2D, texPack);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, 
+		  GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
+		  GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texPackW, 
+	       texPackH, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+	       image);
+
+  free(image);
+}
+
+
 void
 display()
 {
@@ -443,6 +483,13 @@ display()
 
   assert(gettimeofday(&frameStart, NULL) == 0);
 
+  glEnable(GL_TEXTURE_2D);
+
+  glBindTexture(GL_TEXTURE_2D, texPack);
+  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+  
+
+  
   //process user input
   getAimVector();
   callKeyActions();
@@ -468,6 +515,8 @@ display()
   else if(minFR > frameRate) minFR = frameRate;
   avrFR = (avrFR * (refreshRate - 1) + frameRate) / refreshRate;
 
+  glDisable(GL_TEXTURE_2D);
+  
   glutSwapBuffers();
   glutPostRedisplay();
 }
@@ -555,8 +604,8 @@ void BDinit()
 	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
 	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
 
-	  int n = (int)(pnoise2d(worldX / 20.0, worldZ/20.0,
-				 .8, 3, 1) * 10 + 20 );
+	  int n = (int)(pnoise2d(worldX / 50.0, worldZ/50.0,
+				 1, 8, 1) * 20 + 30 );
 	  //printf("%d\t%d\t%d\n", worldX, worldZ, n);
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
@@ -565,7 +614,7 @@ void BDinit()
 	       	y < n
 		){
 	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
-	      printf("%d,%d,%d\t%d\n", worldX, worldZ, y, n);
+	      //	      printf("%d,%d,%d\t%d\n", worldX, worldZ, y, n);
 	    }
 	    else
 	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
@@ -590,7 +639,6 @@ void VBVinit()
       chunkToVBV(bdwo.x + i * CHUNK_DIM , 0, bdwo.z + j * CHUNK_DIM,
 		 &blockData[i + j * 2 * visibility], vbd[i + j * 2 * visibility]);
       //printf("visible blocks in %d %d: %d\n", i, j, vbd[i + j * 2 * visibility]->length);
-      VBVprint(vbd[i + j * 2 * visibility]);
     }
   printf("init vbd finished\n");
 
@@ -599,7 +647,6 @@ void VBVinit()
 int
 main (int argc, char **argv)
 {
-
   pos.x = 0;
   pos.y = 0;
   pos.z = 3;
@@ -620,7 +667,7 @@ main (int argc, char **argv)
 
   BDinit();
 
-  BDprint();
+  //BDprint();
   
   VBVinit();
   
@@ -638,6 +685,23 @@ main (int argc, char **argv)
   glClearColor(0.25, 0.5, 0.8, 1);
   //glEnable(GL_CULL_FACE);
   //glCullFace(GL_BACK);
+  makeCheckImage();
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  glGenTextures(1, &texName);
+  glBindTexture(GL_TEXTURE_2D, texName);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, 
+		  GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
+		  GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, checkImageWidth, 
+	       checkImageHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+	       checkImage);
+  printf("made check image\n");
+  decodeOneStep("./media/texturePack.png");
 
   
   glutPassiveMotionFunc(passiveMotion);
