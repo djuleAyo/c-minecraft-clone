@@ -13,19 +13,30 @@ preview vid
 
 tag v0.1.0
 
-visible 3d array of vectors
-	3d array accesing funcs
-	vector resizing and util funcs
-draw visible and test draw visible
-block data struct
-populate block data
-populate visible
-test
-noiselib
-black mountine side- terain config
+visible 3d array of vectors		done
+	3d array accesing funcs		done
+	vector resizing and util funcs	done
+draw visible and test draw visible	done
+block data struct     	   		done
+populate block data			done
+populate visible			done
+test	 				done
+noiselib				done
+black mountine side- terain config	done
 skybox
 
 tag v0.1.1
+
+
+opt vbv drawing
+make block type arg of block drawing func
+caves
+vertical proximity: bedrock and dirt
+water
+proximity: sand to water
+3d noise internal block type
+
+
 
 later: water, block types, trees, move physics, changes, items and building
 

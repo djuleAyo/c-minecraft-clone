@@ -8,7 +8,6 @@
 #include "lodepng.h"
 #include "perlin.h"
 #include "keyStore.h"
-#include "SOIL.h"
 
 typedef char cubeFaces;
 #define CUBE_FACE_NONE  0
@@ -609,16 +608,16 @@ void BDinit()
 	  //printf("%d\t%d\t%d\n", worldX, worldZ, n);
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
-
-	    if( //pow(worldX - 10, 2) + pow(y, 2) + pow(worldZ, 2)  < 100
-	       	y < n
-		){
-	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
-	      //	      printf("%d,%d,%d\t%d\n", worldX, worldZ, y, n);
+	    if(y < n){
+	      double n3d = pnoise3d(worldX / 50.0, y / 50.0, worldZ / 50.0, 1, 1, 1);
+	      if(fabs(n3d) < 0.1){
+		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
+	      }
+	      else
+		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
 	    }
-	    else
+	    else 
 	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
-
 	  }
 	}
   printf("block data init finished\n");
