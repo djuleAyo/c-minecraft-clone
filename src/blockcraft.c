@@ -603,17 +603,20 @@ void BDinit()
 	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
 	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
 
-	  int n = (int)(pnoise2d(worldX / 50.0, worldZ/50.0,
-				 1, 8, 1) * 20 + 30 );
+	  int n = (int)(pnoise2d(worldX / 70.0, worldZ/70.0,
+				 .8, 6, 1) * 20 + 30 );
+
+	  int n1 = (int)(pnoise2d(worldX / 30.0, worldZ/30.0,
+				 .8, 6, 1) * 10 + 30 );
 	  //printf("%d\t%d\t%d\n", worldX, worldZ, n);
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
-	    if(y < n){
+	    if(y < n + n1){
 	      double n3d = pnoise3d(worldX / 50.0, y / 50.0, worldZ / 50.0, 1, 1, 1);
-	      if(fabs(n3d) < 0.1){
-		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
-	      }
-	      else
+	      //if(fabs(n3d) < 0.1){
+	      //(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
+	      //}
+	      //else
 		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
 	    }
 	    else 

@@ -29,6 +29,7 @@ tag v0.1.1
 
 
 opt vbv drawing
+    display list
 make block type arg of block drawing func
 caves
 vertical proximity: bedrock and dirt
@@ -38,5 +39,10 @@ proximity: sand to water
 
 
 
-later: water, block types, trees, move physics, changes, items and building
+water
+block types
+trees
+move physics
+changes
+items and building
 
