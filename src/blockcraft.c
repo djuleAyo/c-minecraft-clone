@@ -60,7 +60,7 @@ struct timeval frameEnd;
    effects dimensions of terrain data structures
    effects projection far plane
 */
-int visibility = 7;
+int visibility = 20;
 
 
 chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
@@ -78,12 +78,220 @@ static GLuint texPack;
 unsigned texPackW;
 unsigned texPackH;
 
-
+/* display list id*/
 int terrain;
+
+#define tmpLen 10000000
+GLint *tVerts;
+GLfloat *tTex;
+
+int tVertsNum = 0;
+int tTexNum = 0;
+
+void VBVtoArrays()
+{
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++){
+      VBV *v = vbd[i + j * 2 * visibility];
+      for(int k = 0; k < v->length; k++){
+	
+	int mask = v->data[k].visibleFaces;
+	int x = v->data[k].coords.x;
+	int y = v->data[k].coords.y;
+	int z = v->data[k].coords.z;
+
+	if(mask & CUBE_FACE_UP) {
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 8 * 1.0 / 16;
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+
+ 	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 8 * 1.0 / 16;
+	  tTex[tTexNum++] = 5 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 9 * 1.0 / 16;
+	  tTex[tTexNum++] = 5 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 9 * 1.0 / 16;
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	 
+	}
+  
+	if(mask & CUBE_FACE_DOWN) {
+    	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = .0;
+	  tTex[tTexNum++] = .0;
+
+ 	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = .0;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  
+	}
+	if(mask & CUBE_FACE_WEST) {
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+ 	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	 
+    	}
+	if(mask & CUBE_FACE_EAST) {
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+ 	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	     
+	}
+	if(mask & CUBE_FACE_NORTH) {
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+ 	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z + 1;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	 
+	}
+	if(mask & CUBE_FACE_SOUTH) {
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+ 	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 1 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x + 1;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 3 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+
+	  tVerts[tVertsNum++] = x;
+	  tVerts[tVertsNum++] = y + 1;
+	  tVerts[tVertsNum++] = z;
+	  
+	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	 
+	}
+      }
+    }   
+}
 
 int
 main (int argc, char **argv)
 {
+  tVerts = malloc(sizeof(int) * tmpLen);
+  tTex = malloc(sizeof(float) * tmpLen);
+  assert(tVerts && tTex);
+  
   pos.x = 0;
   pos.y = 50;
   pos.z = 0;
@@ -104,6 +312,8 @@ main (int argc, char **argv)
 
   BDinit();
   VBDinit();
+  VBVtoArrays();
+  printf("finished VBVto arrays\n");
   
   glutInit(&argc, argv);
 
@@ -124,8 +334,12 @@ main (int argc, char **argv)
 
   glBindTexture(GL_TEXTURE_2D, texPack);
   glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-  
 
+  glEnableClientState(GL_VERTEX_ARRAY);
+  glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+  glVertexPointer(3, GL_INT, 0, tVerts);
+  glTexCoordPointer(2, GL_FLOAT, 0, tTex);
 
   terrain = glGenLists(1);
   glNewList(terrain, GL_COMPILE);
@@ -511,8 +725,10 @@ display()
   callActions();
 
   //drawBD();
-  drawVBD();
+  //drawVBD();
   //glCallList(terrain);
+
+  glDrawArrays(GL_QUADS, 0, tVertsNum / 3);
   
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
