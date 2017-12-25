@@ -8,121 +8,149 @@
 #include "lodepng.h"
 #include "perlin.h"
 #include "keyStore.h"
-
-typedef char cubeFaces;
-#define CUBE_FACE_NONE  0
-#define CUBE_FACE_NORTH 1
-#define CUBE_FACE_SOUTH 2
-#define CUBE_FACE_UP    4
-#define CUBE_FACE_DOWN  8
-#define CUBE_FACE_EAST 16
-#define CUBE_FACE_WEST 32
-#define CUBE_FACE_ALL  63
+#include "blockcraft.h"
 
 
-#define timeDif(x, y) (x.tv_sec - y.tv_sec) * 1000000 + x.tv_usec - y.tv_usec
 
-typedef enum {
-  ACTION_MOV_FORWARD,
-  ACTION_MOV_BACK,
-  ACTION_MOV_LEFT,
-  ACTION_MOV_RIGHT,
-  ACTION_MOV_UP,
-  ACTION_MOV_DOWN
-} action;
-
-typedef enum {
-  BLOCK_TYPE_AIR = 0,
-  BLOCK_TYPE_SOIL,
-  BLOCK_TYPE_SAND,
-  BLOCK_TYPE_STONE,
-} blockType;
-
-typedef struct {
-  int x;
-  int y;
-  int z;
-} worldCoords;
-
-typedef worldCoords chunkCoords;
-
-typedef struct {
-  double x;
-  double y;
-  double z;
-} vec3;
 
 const double PI = 3.14159265;
 
-worldCoords testCubes[100];
-
+/* position of camera */
 vec3 pos;
-vec3 aim;
 
+/* looking direction
+   mouse input is added to these angles which are then computed to
+   R^3 vector
+*/
 double aimFi;
 double aimTheta;
 
+vec3 aim;
+
+/* current position of mouse in the window */
 int mouseX;
 int mouseY;
 
+//
+double mouseSensitivity = .5;
+
+/* window height and width */
 int windowW;
 int windowH;
 
+/* main game loop is called once for each frame
+   if the function executes fast enough fps = rr where rr is refresh
+   rate. So to benchmark above rr we compute the time needed for
+   game loop execution. given values are in us - milisecs.
+*/
 int refreshRate = 0;
 double minFR = 0;
 double maxFR = 0;
 double avrFR = 0;
 
+/*these are used for frame rate computation and for
+  animations as current time
+*/
 struct timeval frameStart;
 struct timeval frameEnd;
 
-double delta = .5;
-
-//this is in chunks
-int visibility = 10;
-
-#define MAX_HEIGHT 256
-#define CHUNK_DIM 16
-//blockType testChunk[ 2 * visibility * 2 * visibility * 2 * visibility * CHUNK_DIM * CHUNK_DIM * CHUNK_DIM];
-
-typedef blockType chunk[CHUNK_DIM * CHUNK_DIM * MAX_HEIGHT];
-
-typedef struct{
-  worldCoords coords;
-  blockType type;
-  short visibleFaces;
-} visibleBlock;
-
-typedef struct{
-  visibleBlock *data;
-  int volume;
-  int length;
-} VBV;
-
-#define INITIAL_VBV_VOLUME 256
 
 
-#define checkImageWidth 64
-#define checkImageHeight 64
-static GLubyte checkImage[checkImageHeight][checkImageWidth][4];
+/* measure given in chunks
+   effects dimensions of terrain data structures
+   effects projection far plane
+*/
+int visibility = 7;
 
-static GLuint texName;
 
-void makeCheckImage(void)
+chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
+worldCoords bdwo; // block data world origin
+worldCoords bdmo; // block data memory origin
+
+/*visible block data - structure for holding visible blocks - only 
+  ones that get drawn
+*/
+VBV **vbd; 
+
+/* minecraft texture pack
+ */
+static GLuint texPack;
+unsigned texPackW;
+unsigned texPackH;
+
+
+int terrain;
+
+int
+main (int argc, char **argv)
 {
-   int i, j, c;
-    
-   for (i = 0; i < checkImageHeight; i++) {
-      for (j = 0; j < checkImageWidth; j++) {
-         c = ((((i&0x8)==0)^((j&0x8))==0))*255;
-         checkImage[i][j][0] = (GLubyte) c;
-         checkImage[i][j][1] = (GLubyte) c;
-         checkImage[i][j][2] = (GLubyte) c;
-         checkImage[i][j][3] = (GLubyte) 255;
-      }
-   }
+  pos.x = 0;
+  pos.y = 50;
+  pos.z = 0;
+
+  mouseX = 0;
+  mouseY = 0;
+
+  bdwo.x = 0;
+  bdwo.y = 0;
+  bdwo.z = 0;
+
+
+
+  //for since data for both sides of player is kept
+  //since aim can be changed fast
+  blockData = malloc(sizeof(chunk) * 4 * visibility * visibility);
+  assert(blockData);
+
+  BDinit();
+  VBDinit();
+  
+  glutInit(&argc, argv);
+
+  //set some states
+  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
+
+  glutCreateWindow("BlockCraft");
+  glutFullScreen();
+  glutSetCursor(GLUT_CURSOR_NONE);
+  glClearColor(0.25, 0.5, 0.8, 1);
+  //glEnable(GL_CULL_FACE);
+  //glCullFace(GL_BACK);
+
+  loadTexPack("./media/texturePack.png");
+
+  glEnable(GL_TEXTURE_2D);
+
+  glBindTexture(GL_TEXTURE_2D, texPack);
+  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+  
+
+
+  terrain = glGenLists(1);
+  glNewList(terrain, GL_COMPILE);
+  drawVBD();
+  glEndList();
+  
+  glutPassiveMotionFunc(passiveMotion);
+  glutReshapeFunc(reshape);
+  glutDisplayFunc(display);
+  glutKeyboardFunc(keyboard);
+  glutKeyboardUpFunc(keyboardUp);
+  glutTimerFunc(1000, showRefreshRate, 0);
+
+  glEnable(GL_DEPTH_TEST);
+
+  glutMainLoop();
 }
 
+
+/*
+  VBV stands for visible block vector
+  these are main part of VBD - visible block data
+  
+  used for storing block types 
+ */
 VBV *VBVmake()
 {
   VBV *new = malloc(sizeof(VBV));
@@ -163,7 +191,7 @@ void VBVexpand(VBV *v)
   assert(v->data);
 }
 
-void VBVadd(VBV *v, int x, int y, int z, blockType type, int faces)
+void VBVadd(VBV *v, wCoordX x, wCoordY y, wCoordZ z, blockType type, int faces)
 {
   if(v->length == v->volume)
     VBVexpand(v);
@@ -187,17 +215,16 @@ void VBVprint(VBV *v)
   printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
   for(int i = 0; i < v->length; i++){
     visibleBlock *b = &(v->data[i]);
-    printf("%d\t%d\t%d\t\t%d\n",b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+    printf("%d\t%d\t%d\t\t%d\n", b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
   }
   
 }
 
-chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
-worldCoords bdwo; // block data world origin
-worldCoords bdmo; // block data memory origin
 
 
-int isCached(int x, int y, int z)
+/* checking if a block is in range of VBD
+ */
+int isCached(wCoordX x, wCoordY y, wCoordZ z)
 {
   if(x < bdwo.x || x >= bdwo.x + 2 * visibility * CHUNK_DIM) return 0;
   if(y < bdwo.y || y >= bdwo.y + 2 * visibility * CHUNK_DIM) return 0;
@@ -206,23 +233,13 @@ int isCached(int x, int y, int z)
   return 1;
 }
 
-blockType readCacheBlock(int x, int y, int z)
+blockType readCacheBlock(wCoordX x, wCoordY y, wCoordZ z)
 {
   worldCoords delta;
   delta.x = x - bdwo.x;
   delta.y = y - bdwo.y;
   delta.z = z - bdwo.z;
 
-  /*
- printf("read cache block\n");
-
- printf("for x %d , y %d, z %d checking out %d %d chunk and %d %d %d block\n",
-	x, y, z,
-	delta.x / CHUNK_DIM, delta.z / CHUNK_DIM * 2 * visibility,
-	delta.x % CHUNK_DIM,
-	delta.y * CHUNK_DIM,
-	(delta.z % CHUNK_DIM) * CHUNK_DIM * MAX_HEIGHT);
-  */
  return (blockData[(delta.x / CHUNK_DIM) + (delta.z / CHUNK_DIM) * 2 * visibility])
     [(delta.x % CHUNK_DIM)
      + (delta.y) * CHUNK_DIM
@@ -230,12 +247,13 @@ blockType readCacheBlock(int x, int y, int z)
   
 }
 
-void chunkToVBV(int oX, int oY, int oZ, chunk *c, VBV *v)
+/* make VBV representation of a chunk */
+void chunkToVBV(wCoordX oX, wCoordY oY, wCoordZ oZ, chunk *c, VBV *v)
 {
-  for(int i = 0; i < 16; i++)
-    for(int j = 0; j < 256; j++)
-      for(int k = 0; k < 16; k++){
-	if(!(*c)[i + j * 16 + k * 16 * 256]) continue;
+  for(int i = 0; i < CHUNK_DIM; i++)
+    for(int j = 0; j < MAX_HEIGHT; j++)
+      for(int k = 0; k < CHUNK_DIM; k++){
+	if(!(*c)[i + j * CHUNK_DIM + k * CHUNK_DIM * MAX_HEIGHT]) continue;
 	short faces = 0;
 	if(isCached(oX + i  - 1, j, k + oZ) && !readCacheBlock(oX + i - 1, j, k + oZ))
 	  faces |= CUBE_FACE_WEST;
@@ -271,17 +289,8 @@ void BDprint()
   }
 }
 
-VBV **vbd; // visible block data
-
-void getAimVector()
-{
-  aim.x = cos(aimTheta) * cos(aimFi);
-  aim.y = sin(aimTheta);
-  aim.z = cos(aimTheta) * sin(aimFi);
-}
-
 void
-drawCubeFaces(int x, int y, int z,  cubeFaces mask)
+drawCubeFaces(wCoordX x, wCoordY y, wCoordZ z,  cubeFaces mask)
 {
   // intended to draw any subset of cubes faces
   // o as origin. the origin of a cube is vert that takes
@@ -352,39 +361,70 @@ drawCubeFaces(int x, int y, int z,  cubeFaces mask)
   }
   
 }
+void drawVBD()
+{
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++){
+      VBV *v = vbd[i + j * 2 * visibility];
+      for(int x = 0; x < v->length; x++) {
+	visibleBlock *b = &(v->data[x]);
+	drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+	//drawCubeFaces(v->data[x].coords.x + i * CHUNK_DIM, v->data[x].coords.y, v->data[x].coords.z + j * CHUNK_DIM, v->data[x].visibleFaces);
+      }
+      
+    }
+}
+void drawBD()
+{
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < 2 * visibility; j++)
+      for(int x = 0; x < CHUNK_DIM; x++)
+	for(int y = 0; y < MAX_HEIGHT; y++)
+	  for(int z = 0; z < CHUNK_DIM; z++){
+	    if(readCacheBlock(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z))
+	      drawCubeFaces(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z, CUBE_FACE_ALL);      
+	  }
+}
+
+void getAimVector()
+{
+  aim.x = cos(aimTheta) * cos(aimFi);
+  aim.y = sin(aimTheta);
+  aim.z = cos(aimTheta) * sin(aimFi);
+}
 
 void movForward()
 {
-  pos.x += delta * aim.x;
-  pos.y += delta * aim.y;
-  pos.z += delta * aim.z;
+  pos.x += mouseSensitivity * aim.x;
+  pos.y += mouseSensitivity * aim.y;
+  pos.z += mouseSensitivity * aim.z;
 }
 void movBack()
 {
-  pos.x -= delta * aim.x;
-  pos.y -= delta * aim.y;
-  pos.z -= delta * aim.z;
+  pos.x -= mouseSensitivity * aim.x;
+  pos.y -= mouseSensitivity * aim.y;
+  pos.z -= mouseSensitivity * aim.z;
 }
 void movLeft()
 {
-  pos.x += delta * sin(aimFi);
-  pos.z -= delta * cos(aimFi);
+  pos.x += mouseSensitivity * sin(aimFi);
+  pos.z -= mouseSensitivity * cos(aimFi);
 }
 void movRight()
 {
-  pos.x -= delta * sin(aimFi);
-  pos.z += delta * cos(aimFi);
+  pos.x -= mouseSensitivity * sin(aimFi);
+  pos.z += mouseSensitivity * cos(aimFi);
 }
 void movUp()
 {
-  pos.y += delta;
+  pos.y += mouseSensitivity;
 }
 void movDown()
 {
-  pos.y -= delta;
+  pos.y -= mouseSensitivity;
 }
 
-void callKeyActions()
+void callActions()
 {
   keyEnt *i = keyTable;
 
@@ -416,37 +456,8 @@ void callKeyActions()
   }
 }
 
-void drawVBD()
-{
-  for(int i = 0; i < 2 * visibility; i++)
-    for(int j = 0; j < 2 * visibility; j++){
-      VBV *v = vbd[i + j * 2 * visibility];
-      for(int x = 0; x < v->length; x++) {
-	visibleBlock *b = &(v->data[x]);
-	drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
-	//drawCubeFaces(v->data[x].coords.x + i * CHUNK_DIM, v->data[x].coords.y, v->data[x].coords.z + j * CHUNK_DIM, v->data[x].visibleFaces);
-      }
-      
-    }
-}
-void drawBD()
-{
-  for(int i = 0; i < 2 * visibility; i++)
-    for(int j = 0; j < 2 * visibility; j++)
-      for(int x = 0; x < CHUNK_DIM; x++)
-	for(int y = 0; y < MAX_HEIGHT; y++)
-	  for(int z = 0; z < CHUNK_DIM; z++){
-	    if(readCacheBlock(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z))
-	      drawCubeFaces(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z, CUBE_FACE_ALL);      
-	  }
-}
 
-unsigned texPackW;
-unsigned texPackH;
-
-static GLuint texPack;
-
-void decodeOneStep(const char* filename)
+void loadTexPack(const char* filename)
 {
   unsigned error;
   unsigned char* image;
@@ -474,36 +485,8 @@ void decodeOneStep(const char* filename)
   free(image);
 }
 
-
-void
-display()
+void getFR()
 {
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-  assert(gettimeofday(&frameStart, NULL) == 0);
-
-  glEnable(GL_TEXTURE_2D);
-
-  glBindTexture(GL_TEXTURE_2D, texPack);
-  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-  
-
-  
-  //process user input
-  getAimVector();
-  callKeyActions();
-
-  //drawBD();
-  drawVBD();
-  
-  glLoadIdentity ();          
-  gluLookAt (pos.x, pos.y, pos.z,
-	     pos.x + aim.x,
-	     pos.y + aim.y,
-	     pos.z + aim.z,
-	     0.0, 1.0, 0.0
-	     );
-  
   refreshRate++;
 
   assert(gettimeofday(&frameEnd, NULL) == 0);
@@ -514,8 +497,33 @@ display()
   else if(minFR > frameRate) minFR = frameRate;
   avrFR = (avrFR * (refreshRate - 1) + frameRate) / refreshRate;
 
-  glDisable(GL_TEXTURE_2D);
+}
+
+void
+display()
+{
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  assert(gettimeofday(&frameStart, NULL) == 0);
   
+  //process user input
+  getAimVector();
+  callActions();
+
+  //drawBD();
+  drawVBD();
+  //glCallList(terrain);
+  
+  glLoadIdentity ();          
+  gluLookAt (pos.x, pos.y, pos.z,
+	     pos.x + aim.x,
+	     pos.y + aim.y,
+	     pos.z + aim.z,
+	     0.0, 1.0, 0.0
+	     );
+  
+  getFR();
+   
   glutSwapBuffers();
   glutPostRedisplay();
 }
@@ -523,8 +531,6 @@ display()
 void
 keyboard(unsigned char c, int x, int y)
 {
-  double delta = .1;
-
   press(c);
 }
 
@@ -568,7 +574,7 @@ void reshape (int w, int h)
   glViewport (0, 0, (GLsizei) w, (GLsizei) h); 
   glMatrixMode (GL_PROJECTION);
   glLoadIdentity ();
-  gluPerspective(60, w / (float) h, 1, 200);
+  gluPerspective(60, w / (float) h, 1, visibility * 16);
   glMatrixMode (GL_MODELVIEW);
 
   glutWarpPointer(w / 2, h / 2);
@@ -617,16 +623,16 @@ void BDinit()
 	      //(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
 	      //}
 	      //else
-		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_SOIL;
+		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_SOIL;
 	    }
 	    else 
-	      (blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
+	      (blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_AIR;
 	  }
 	}
   printf("block data init finished\n");
 }
 
-void VBVinit()
+void VBDinit()
 {
   printf("initing vbd\n");
   vbd = malloc (sizeof(VBV*) * 4 * visibility * visibility);
@@ -646,74 +652,3 @@ void VBVinit()
 
 }
 
-int
-main (int argc, char **argv)
-{
-  pos.x = 0;
-  pos.y = 0;
-  pos.z = 3;
-
-  mouseX = 0;
-  mouseY = 0;
-
-  bdwo.x = 0;
-  bdwo.y = 0;
-  bdwo.z = 0;
-
-
-
-  //for since data for both sides of player is kept
-  //since aim can be changed fast
-  blockData = malloc(sizeof(chunk) * 4 * visibility * visibility);
-  assert(blockData);
-
-  BDinit();
-
-  //BDprint();
-  
-  VBVinit();
-  
-
-  
-  glutInit(&argc, argv);
-
-  //set some states
-  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
-
-  glutCreateWindow("BlockCraft");
-  glutFullScreen();
-  glutSetCursor(GLUT_CURSOR_NONE);
-  glClearColor(0.25, 0.5, 0.8, 1);
-  //glEnable(GL_CULL_FACE);
-  //glCullFace(GL_BACK);
-  makeCheckImage();
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-  glGenTextures(1, &texName);
-  glBindTexture(GL_TEXTURE_2D, texName);
-
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, 
-		  GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
-		  GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, checkImageWidth, 
-	       checkImageHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
-	       checkImage);
-  printf("made check image\n");
-  decodeOneStep("./media/texturePack.png");
-
-  
-  glutPassiveMotionFunc(passiveMotion);
-  glutReshapeFunc(reshape);
-  glutDisplayFunc(display);
-  glutKeyboardFunc(keyboard);
-  glutKeyboardUpFunc(keyboardUp);
-  glutTimerFunc(1000, showRefreshRate, 0);
-
-  glEnable(GL_DEPTH_TEST);
-
-  glutMainLoop();
-}
