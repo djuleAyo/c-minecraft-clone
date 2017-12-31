@@ -10,9 +10,6 @@
 #include "keyStore.h"
 #include "blockcraft.h"
 
-
-
-
 const double PI = 3.14159265;
 
 /* position of camera */
@@ -60,7 +57,7 @@ struct timeval frameEnd;
    effects dimensions of terrain data structures
    effects projection far plane
 */
-int visibility = 20;
+int visibility = 2;
 
 
 chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
@@ -78,6 +75,28 @@ static GLuint texPack;
 unsigned texPackW;
 unsigned texPackH;
 
+int texCoords[] = {
+  //order: u, d, n, e, s, w
+  -1, -1, -1, -1, -1, -1,
+  //BLOCK_TYPE_SOIL
+  TEX_SOIL, TEX_SOIL, TEX_SOIL, TEX_SOIL, TEX_SOIL, TEX_SOIL,
+  //BLOCK_TYPE_GRASS,
+  TEX_GRASS_TOP, TEX_SOIL, TEX_GRASS_SIDE, TEX_GRASS_SIDE, TEX_GRASS_SIDE, TEX_GRASS_SIDE,
+  //BLOCK_TYPE_SAND,
+  TEX_SAND, TEX_SAND, TEX_SAND, TEX_SAND, TEX_SAND, TEX_SAND,
+  //BLOCK_TYPE_STONE,
+  TEX_STONE, TEX_STONE, TEX_STONE, TEX_STONE, TEX_STONE, TEX_STONE,
+  //BLOCK_TYPE_OAK_WOOD,
+  TEX_OAK_TOP, TEX_OAK_TOP, TEX_OAK_SIDE, TEX_OAK_SIDE, TEX_OAK_SIDE, TEX_OAK_SIDE,
+  //BLOCK_TYPE_OAT_LEAF,
+  TEX_OAK_LEAF, TEX_OAK_LEAF, TEX_OAK_LEAF, TEX_OAK_LEAF, TEX_OAK_LEAF, TEX_OAK_LEAF,
+  //BLOCK_TYPE_WATER,
+  TEX_WATER, TEX_WATER, TEX_WATER, TEX_WATER, TEX_WATER, TEX_WATER,
+  //BLOCK_TYPE_LAVA
+  TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, 
+
+};
+
 /* display list id*/
 int terrain;
 
@@ -85,6 +104,7 @@ int terrain;
 GLint *tVerts;
 GLfloat *tTex;
 
+//terrain
 int tVertsNum = 0;
 int tTexNum = 0;
 
@@ -93,7 +113,10 @@ void VBVtoArrays()
   for(int i = 0; i < 2 * visibility; i++)
     for(int j = 0; j < 2 * visibility; j++){
       VBV *v = vbd[i + j * 2 * visibility];
+
       for(int k = 0; k < v->length; k++){
+	int *tex = &texCoords[v->data[k].type * 6];
+	printf("block type %d\n", v->data[k].type);
 	
 	int mask = v->data[k].visibleFaces;
 	int x = v->data[k].coords.x;
@@ -101,184 +124,209 @@ void VBVtoArrays()
 	int z = v->data[k].coords.z;
 
 	if(mask & CUBE_FACE_UP) {
+
+	  int texX = tex[0] % 16;
+	  int texY = tex[0] / 16;
+
+	  printf("%d %d\n", texX, texY);
+			       	  
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 8 * 1.0 / 16;
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
  	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 8 * 1.0 / 16;
-	  tTex[tTexNum++] = 5 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 9 * 1.0 / 16;
-	  tTex[tTexNum++] = 5 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 9 * 1.0 / 16;
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 	 
 	}
   
 	if(mask & CUBE_FACE_DOWN) {
+	  int texX = tex[1] % 16;
+	  int texY = tex[1] / 16;
+	  printf("%d %d\n", texX, texY);	  
     	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = .0;
-	  tTex[tTexNum++] = .0;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
  	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = .0;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 	  
 	}
 	if(mask & CUBE_FACE_WEST) {
+	  
+	  int texX = tex[5] % 16;
+	  int texY = tex[5] / 16;
+	  printf("%d %d\n", texX, texY);
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
  	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 	 
     	}
 	if(mask & CUBE_FACE_EAST) {
+
+	  int texX = tex[3] % 16;
+	  int texY = tex[3] / 16;
+	  printf("%d %d\n", texX, texY);
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
  	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 	     
 	}
 	if(mask & CUBE_FACE_NORTH) {
+
+	  int texX = tex[2] % 16;
+	  int texY = tex[2] / 16;
+	  printf("%d %d\n", texX, texY);
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
  	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z + 1;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 	 
 	}
 	if(mask & CUBE_FACE_SOUTH) {
+
+	  int texX = tex[4] % 16;
+	  int texY = tex[4] / 16;
+	  printf("%d %d\n", texX, texY);
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
  	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 1 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = (texY + 1) / (float) 16;
 
 	  tVerts[tVertsNum++] = x + 1;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 3 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = texX / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 
 	  tVerts[tVertsNum++] = x;
 	  tVerts[tVertsNum++] = y + 1;
 	  tVerts[tVertsNum++] = z;
 	  
-	  tTex[tTexNum++] = 4 * 1.0 / 16;
-	  tTex[tTexNum++] = 0 * 1.0 / 16;
+	  tTex[tTexNum++] = (texX + 1) / (float) 16;
+	  tTex[tTexNum++] = texY / (float) 16;
 	 
 	}
       }
@@ -311,7 +359,11 @@ main (int argc, char **argv)
   assert(blockData);
 
   BDinit();
+
+  //  blockData[ 0 ] [ 1 + 16 + 256 * 16] = BLOCK_TYPE_SAND;
+  
   VBDinit();
+  VBVprint(vbd[0]);
   VBVtoArrays();
   printf("finished VBVto arrays\n");
   
@@ -341,10 +393,14 @@ main (int argc, char **argv)
   glVertexPointer(3, GL_INT, 0, tVerts);
   glTexCoordPointer(2, GL_FLOAT, 0, tTex);
 
+  glColor3f(0, 1, 0);
+
   terrain = glGenLists(1);
   glNewList(terrain, GL_COMPILE);
   drawVBD();
   glEndList();
+
+  printf("passed the list\n");
   
   glutPassiveMotionFunc(passiveMotion);
   glutReshapeFunc(reshape);
@@ -429,7 +485,7 @@ void VBVprint(VBV *v)
   printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
   for(int i = 0; i < v->length; i++){
     visibleBlock *b = &(v->data[i]);
-    printf("%d\t%d\t%d\t\t%d\n", b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+    printf("%d\t%d\t%d\t\t%d\t\t%d\n", b->coords.x, b->coords.y, b->coords.z, b->visibleFaces, b->type);
   }
   
 }
@@ -469,21 +525,24 @@ void chunkToVBV(wCoordX oX, wCoordY oY, wCoordZ oZ, chunk *c, VBV *v)
       for(int k = 0; k < CHUNK_DIM; k++){
 	if(!(*c)[i + j * CHUNK_DIM + k * CHUNK_DIM * MAX_HEIGHT]) continue;
 	short faces = 0;
-	if(isCached(oX + i  - 1, j, k + oZ) && !readCacheBlock(oX + i - 1, j, k + oZ))
+	if(!isCached(oX + i  - 1, j, k + oZ) || !readCacheBlock(oX + i - 1, j, k + oZ))
 	  faces |= CUBE_FACE_WEST;
-	if(isCached(oX + i  + 1, j, k + oZ) && !readCacheBlock(oX + i  + 1, j, k + oZ))
+	if(!isCached(oX + i  + 1, j, k + oZ) || !readCacheBlock(oX + i  + 1, j, k + oZ))
 	  faces |= CUBE_FACE_EAST;
-	if(isCached(i + oX, oY + j - 1, k + oZ) && !readCacheBlock(i + oX, oY + j - 1, k + oZ))
+	if(!isCached(i + oX, oY + j - 1, k + oZ) || !readCacheBlock(i + oX, oY + j - 1, k + oZ))
 	  faces |= CUBE_FACE_DOWN;
-	if(isCached(i + oX, j  + 1, k + oZ) && !readCacheBlock(i + oX, j + 1, k + oZ))
+	if(!isCached(i + oX, j  + 1, k + oZ) || !readCacheBlock(i + oX, j + 1, k + oZ))
 	  faces |= CUBE_FACE_UP;
-	if(isCached(i + oX, j, oZ + k  - 1) && !readCacheBlock(i + oX, j, oZ + k  - 1))
+	if(!isCached(i + oX, j, oZ + k  - 1) || !readCacheBlock(i + oX, j, oZ + k  - 1))
 	  faces |= CUBE_FACE_SOUTH;
-	if(isCached(i + oX, j, oZ + k  + 1) && !readCacheBlock(i + oX, j, oZ + k  + 1))
+	if(!isCached(i + oX, j, oZ + k  + 1) || !readCacheBlock(i + oX, j, oZ + k  + 1))
 	  faces |= CUBE_FACE_NORTH;
 
 	if(faces){
-	  VBVadd(v, oX + i, j + oY, k + oZ, BLOCK_TYPE_SOIL, faces);
+	  VBVadd(v, oX + i, j + oY, k + oZ,
+		 (*c)[i + j * CHUNK_DIM + k * CHUNK_DIM * MAX_HEIGHT]
+		 , faces);
+		
 	}
       }
 }
@@ -504,73 +563,91 @@ void BDprint()
 }
 
 void
-drawCubeFaces(wCoordX x, wCoordY y, wCoordZ z,  cubeFaces mask)
+drawCubeFaces(wCoordX x, wCoordY y, wCoordZ z,  cubeFaces mask, blockType block)
 {
   // intended to draw any subset of cubes faces
   // o as origin. the origin of a cube is vert that takes
-  // minimal set of vert coord values for given cube is positive quartespace
+  // minimal set of vert coord values for given cube in positive quarterspace
   // meaning the south-west-down corner
   if(!mask) return;
-
+  int *tex = &texCoords[(int)block * 6];
+  
   if(mask & CUBE_FACE_UP) {
-    glColor3f(.0, 1.0, .0);
+
+    int texX = tex[0] % 16;
+    int texY = tex[0] / 16;
 
     glBegin(GL_QUADS);
-    glTexCoord2f(8 * 1.0 / 16, 4 * 1.0 / 16); glVertex3i(x, y + 1, z);
-    glTexCoord2f(8 * 1.0 / 16, 5 * 1.0 / 16); glVertex3i(x + 1, y + 1, z);
-    glTexCoord2f(9 * 1.0 / 16, 5 * 1.0 / 16); glVertex3i(x + 1, y + 1, z + 1);
-    glTexCoord2f(9 * 1.0 / 16, 4 * 1.0 / 16); glVertex3i(x, y + 1, z + 1);
+    glTexCoord2f(texX  / (float) 16, texY / (float) 16); glVertex3i(x, y + 1, z);
+    glTexCoord2f(texX  / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y + 1, z);
+    glTexCoord2f((texX + 1) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y + 1, z + 1);
+    glTexCoord2f((texX + 1) / (float) 16, texY / (float) 16); glVertex3i(x, y + 1, z + 1);
     glEnd();
   }
   
   if(mask & CUBE_FACE_DOWN) {
-    glColor3f(1, 1, 1);
-    
+    //glColor3f(1, 1, 1);
+
+    int texX = tex[1] % 16;
+    int texY = tex[1] / 16;
+
     glBegin(GL_QUADS);
-    glTexCoord2f(0.0, 0.0); glVertex3i(x, y, z);
-    glTexCoord2f(0.0, 1.0 / 16); glVertex3i(x + 1, y, z);
-    glTexCoord2f(1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z + 1);
-    glTexCoord2f(1.0 / 16, 0.0); glVertex3i(x, y, z + 1);
+    glTexCoord2f(texX / (float) 16, texY / (float) 16 ); glVertex3i(x, y, z);
+    glTexCoord2f(texX / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y, z);
+    glTexCoord2f((texX + 1) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y, z + 1);
+    glTexCoord2f((texX + 1) / (float) 16, texY / (float) 16); glVertex3i(x, y, z + 1);
     glEnd();
   }
   if(mask & CUBE_FACE_WEST) {
-    glColor3f(1, 1, 1);
-    
+    //glColor3f(1, 1, 1);
+
+    int texX = tex[5] % 16;
+    int texY = tex[5] / 16;
+
     glBegin(GL_QUADS);
-    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z);
-    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x, y + 1, z);
-    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x, y + 1, z + 1);
-    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z + 1);
+    glTexCoord2f((texX) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x, y, z);
+    glTexCoord2f(texX / (float) 16, texY / (float) 16); glVertex3i(x, y + 1, z);
+    glTexCoord2f((texX + 1) / (float) 16, (texY) / (float) 16); glVertex3i(x, y + 1, z + 1);
+    glTexCoord2f((texX + 1) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x, y, z + 1);
     glEnd();
   }
   if(mask & CUBE_FACE_EAST) {
-    glColor3f(.5, .5, .5);
-    
+    //glColor3f(.5, .5, .5);
+
+    int texX = tex[3] % 16;
+    int texY = tex[3] / 16;
+
     glBegin(GL_QUADS);
-    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z);
-    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z);
-    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z + 1);
-    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z + 1);
+    glTexCoord2f((texX) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y, z);
+    glTexCoord2f((texX) / (float) 16, (texY) / (float) 16); glVertex3i(x + 1, y + 1, z);
+    glTexCoord2f((texX + 1) / (float) 16, (texY) / (float) 16); glVertex3i(x + 1, y + 1, z + 1);
+    glTexCoord2f((texX + 1) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y, z + 1);
     glEnd();
   }
   if(mask & CUBE_FACE_NORTH) {
-    glColor3f(3 * 1.0 / 16, 1.0 / 16, 3 * 1.0 / 16);
-    
+    //glColor3f(3 * 1.0 / (float) 16, 1.0 / (float) 16, 3 * 1.0 / (float) 16);
+
+    int texX = tex[2] % 16;
+    int texY = tex[2] / 16;
+
     glBegin(GL_QUADS);
-    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z + 1);
-    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z + 1);
-    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z + 1);
-    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x, y + 1, z + 1);
+    glTexCoord2f((texX) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x, y, z + 1);
+    glTexCoord2f((texX + 1) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y, z + 1);
+    glTexCoord2f((texX + 1) / (float) 16, (texY) / (float) 16); glVertex3i(x + 1, y + 1, z + 1);
+    glTexCoord2f((texX) / (float) 16, (texY) / (float) 16); glVertex3i(x, y + 1, z + 1);
     glEnd();
     }
   if(mask & CUBE_FACE_SOUTH) {
-    glColor3f(1.0 / 16, 3 * 1.0 / 16, 1.0 / 16);
-    
+    //glColor3f(1.0 / (float) 16, 3 * 1.0 / (float) 16, 1.0 / (float) 16);
+
+    int texX = tex[4] % 16;
+    int texY = tex[4] / 16;
+
     glBegin(GL_QUADS);
-    glTexCoord2f(4 * 1.0 / 16, 1.0 / 16); glVertex3i(x, y, z);
-    glTexCoord2f(3 * 1.0 / 16, 1.0 / 16); glVertex3i(x + 1, y, z);
-    glTexCoord2f(3 * 1.0 / 16, 0); glVertex3i(x + 1, y + 1, z);
-    glTexCoord2f(4 * 1.0 / 16, 0); glVertex3i(x, y + 1, z);
+    glTexCoord2f((texX + 1) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x, y, z);
+    glTexCoord2f((texX) / (float) 16, (texY + 1) / (float) 16); glVertex3i(x + 1, y, z);
+    glTexCoord2f((texX) / (float) 16, (texY) / (float) 16); glVertex3i(x + 1, y + 1, z);
+    glTexCoord2f((texX + 1) / (float) 16, (texY) / (float) 16); glVertex3i(x, y + 1, z);
     glEnd();
   }
   
@@ -582,7 +659,7 @@ void drawVBD()
       VBV *v = vbd[i + j * 2 * visibility];
       for(int x = 0; x < v->length; x++) {
 	visibleBlock *b = &(v->data[x]);
-	drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces);
+	drawCubeFaces(b->coords.x, b->coords.y, b->coords.z, b->visibleFaces, b->type);
 	//drawCubeFaces(v->data[x].coords.x + i * CHUNK_DIM, v->data[x].coords.y, v->data[x].coords.z + j * CHUNK_DIM, v->data[x].visibleFaces);
       }
       
@@ -595,8 +672,9 @@ void drawBD()
       for(int x = 0; x < CHUNK_DIM; x++)
 	for(int y = 0; y < MAX_HEIGHT; y++)
 	  for(int z = 0; z < CHUNK_DIM; z++){
-	    if(readCacheBlock(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z))
-	      drawCubeFaces(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z, CUBE_FACE_ALL);      
+	    blockType b = readCacheBlock(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z);
+	    if(b)
+	      drawCubeFaces(i * CHUNK_DIM  + x, y, j * CHUNK_DIM + z, CUBE_FACE_ALL, b);      
 	  }
 }
 
@@ -790,7 +868,7 @@ void reshape (int w, int h)
   glViewport (0, 0, (GLsizei) w, (GLsizei) h); 
   glMatrixMode (GL_PROJECTION);
   glLoadIdentity ();
-  gluPerspective(60, w / (float) h, 1, visibility * 16);
+  gluPerspective(60, w / (float) h, 1, 5 * visibility * 16);
   glMatrixMode (GL_MODELVIEW);
 
   glutWarpPointer(w / 2, h / 2);
@@ -825,21 +903,30 @@ void BDinit()
 	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
 	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
 
-	  int n = (int)(pnoise2d(worldX / 70.0, worldZ/70.0,
+
+	  int surfice = (int)(pnoise2d(worldX / 70.0, worldZ/70.0,
 				 .8, 6, 1) * 20 + 30 );
 
 	  int n1 = (int)(pnoise2d(worldX / 30.0, worldZ/30.0,
 				 .8, 6, 1) * 10 + 30 );
+
 	  //printf("%d\t%d\t%d\n", worldX, worldZ, n);
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
-	    if(y < n + n1){
-	      double n3d = pnoise3d(worldX / 50.0, y / 50.0, worldZ / 50.0, 1, 1, 1);
-	      //if(fabs(n3d) < 0.1){
-	      //(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
-	      //}
-	      //else
+	    
+	    if(y < surfice /*+ n1*/){
+	      //double n3d = pnoise3d(worldX / 50.0, y / 50.0, worldZ / 50.0, 1, 1, 1);
+	      /*if(fabs(n3d) < 0.1){
+		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
+	      }
+	      else
+	      */
+	      if(y < surfice - 3)
+		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_STONE;
+	      else if(y < surfice - 1)
 		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_SOIL;
+	      else
+		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_GRASS;
 	    }
 	    else 
 	      (blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_AIR;

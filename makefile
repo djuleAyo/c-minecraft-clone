@@ -1,10 +1,13 @@
+LFLAGS=-Iinclude -Llib -lGL -lGLU -lglut -lm -lSOIL
+SOURCES= $(shell ls src/*.c)
+
 all: debug production
 
 debug:
-	gcc -Iinclude -Llib -o bin/debug -pg -g src/lodepng.c src/blockcraft.c src/keyStore.c src/perlin.c -lGL -lGLU -lglut -lm -lSOIL 
+	gcc -o bin/debug -pg -g $(SOURCES) $(LFLAGS) -Wall -Wextra
 
 production:
-	echo "hello production"
+	gcc -o bin/production -O3 $(SOURCES) $(LFLAGS)
 
 
 .PHONY: clean

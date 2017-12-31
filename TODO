@@ -28,12 +28,13 @@ skybox
 tag v0.1.1
 
 
-opt vbv drawing
-    display list
-make block type arg of block drawing func
-caves
+opt vbv drawing				done
+    display list			done
+    vert array				done
+make block type arg of block drawing func		requires tex
+caves	   	       	     	     			
 vertical proximity: bedrock and dirt
-water
+water							requires alpha
 proximity: sand to water
 3d noise internal block type
 

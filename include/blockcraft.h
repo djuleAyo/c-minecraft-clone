@@ -15,9 +15,27 @@ typedef char cubeFaces;
 typedef enum {
   BLOCK_TYPE_AIR = 0,
   BLOCK_TYPE_SOIL,
+  BLOCK_TYPE_GRASS,
   BLOCK_TYPE_SAND,
   BLOCK_TYPE_STONE,
+  BLOCK_TYPE_OAK_WOOD,
+  BLOCK_TYPE_OAT_LEAF,
+  BLOCK_TYPE_WATER,
+  BLOCK_TYPE_LAVA
 } blockType;
+
+typedef enum {
+  TEX_GRASS_TOP= 0,
+  TEX_STONE= 1,
+  TEX_SOIL= 2,
+  TEX_GRASS_SIDE= 3,
+  TEX_SAND= 18,
+  TEX_OAK_SIDE= 20,
+  TEX_OAK_TOP= 21,
+  TEX_OAK_LEAF= 53,
+  TEX_WATER= 239,
+  TEX_LAVA= 256,
+} texture;
 
 /* Used for struct timeval from sys/time.h header */
 #define timeDif(x, y) (x.tv_sec - y.tv_sec) * 1000000 + x.tv_usec - y.tv_usec
@@ -70,11 +88,12 @@ typedef struct{
   visibleBlock *data;
   int volume;
   int length;
+  blockType type;
 } VBV;
 
 #define INITIAL_VBV_VOLUME 256
 
-void drawCubeFaces(wCoordX x, wCoordY y, wCoordZ z,  cubeFaces mask);
+void drawCubeFaces(wCoordX x, wCoordY y, wCoordZ z,  cubeFaces mask, blockType block);
 
 VBV *VBVmake();
 void VBVdel(VBV *v);
