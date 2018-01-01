@@ -1,7 +1,7 @@
 LFLAGS=-Iinclude -Llib -lGL -lGLU -lglut -lm -lSOIL
 SOURCES= $(shell ls src/*.c)
 
-all: debug production
+all: debug #production
 
 debug:
 	gcc -o bin/debug -pg -g $(SOURCES) $(LFLAGS) -Wall -Wextra

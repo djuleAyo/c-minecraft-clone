@@ -33,7 +33,7 @@ typedef enum {
   TEX_OAK_SIDE= 20,
   TEX_OAK_TOP= 21,
   TEX_OAK_LEAF= 53,
-  TEX_WATER= 239,
+  TEX_WATER= 205,
   TEX_LAVA= 256,
 } texture;
 
