@@ -103,7 +103,7 @@ double pnoise2d(double x, double y, double persistence, int octaves, int seed) {
    
    for(i = 0; i < octaves; i++) {
        total += smooth2d(x * frequency, y * frequency, i, seed) * amplitude;
-       frequency /= 2;
+       frequency /= .5;
        amplitude *= persistence;
    } 
 

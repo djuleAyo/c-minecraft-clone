@@ -556,8 +556,8 @@ main (int argc, char **argv)
 
   
   pos.x = 0;
-  pos.y = 50;
-  pos.z = 0;
+  pos.y = 100;
+  pos.z = 160;
 
   mouseX = 0;
   mouseY = 0;
@@ -595,7 +595,7 @@ main (int argc, char **argv)
   //glEnable(GL_CULL_FACE);
   //glCullFace(GL_BACK);
 
-  loadTexPack("./media/texturePack.png");
+  loadTexPack("./media/texturePackGreen.png");
 
   glEnable(GL_TEXTURE_2D);
 
@@ -1160,38 +1160,21 @@ void BDinit()
 	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
 	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
 
+	  biome b = getBiome(bdwo.x +i * CHUNK_DIM + x,
+			     bdwo.z + j * CHUNK_DIM + z);
+	  
 
-	  int surfice = (int)(pnoise2d(worldX / 70.0, worldZ/70.0,
-				 .8, 6, 1) * 20 + 30 );
-
-	  int n1 = (int)(pnoise2d(worldX / 30.0, worldZ/30.0,
-				 .8, 6, 1) * 10 + 30 );
-
-	  //printf("%d\t%d\t%d\n", worldX, worldZ, n);
+	  int surfice = (int)(pnoise2d(worldX / 150.0, worldZ/ 150.0,
+					.5, 5, 1) * 60 + 64 );
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
+	    blockType *block = &(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT];
 	    
-	    if(y < surfice /*+ n1*/){
-	      //double n3d = pnoise3d(worldX / 50.0, y / 50.0, worldZ / 50.0, 1, 1, 1);
-	      /*if(fabs(n3d) < 0.1){
-		(blockData[i + j * 2 * visibility])[x + y * 16 + z * 16 * 256] = BLOCK_TYPE_AIR;
-	      }
-	      else
-	      */
-	      if(y < surfice - 3)
-		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_STONE;
-	      else if(y < surfice - 1)
-		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_SOIL;
-	      else
-		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_GRASS;
+	    if(y < surfice){
+	      *block = BLOCK_TYPE_GRASS;
 	    }
-	    else {
-	      if(y < 40) 
-		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_WATER;
-	      else
-		(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT] = BLOCK_TYPE_AIR;
-
-	    }
+	    else
+	      *block = BLOCK_TYPE_AIR;	
 	  }
 	}
   printf("block data init finished\n");
@@ -1217,3 +1200,6 @@ void VBDinit()
 
 }
 
+biome getBiome(wCoordX x, wCoordZ z){
+
+}

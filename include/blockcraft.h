@@ -72,6 +72,7 @@ typedef struct {
 
 #define MAX_HEIGHT 256
 #define CHUNK_DIM 16
+#define SEA_LEVEL 40
 
 typedef blockType chunk[CHUNK_DIM * CHUNK_DIM * MAX_HEIGHT];
 
@@ -90,6 +91,12 @@ typedef struct{
   int length;
   blockType type;
 } VBV;
+
+typedef enum{
+  BIOME_SEA,
+  BIOME_FOREST,
+  BIOME_DESERT
+} biome;
 
 #define INITIAL_VBV_VOLUME 256
 
@@ -143,3 +150,5 @@ void passiveMotion (int x, int y);
 void reshape (int w, int h);
 
 
+//BIOMES
+biome getBiome(wCoordX x, wCoordZ z);
