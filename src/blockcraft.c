@@ -1204,10 +1204,13 @@ void BDinit()
 	    blockType *block = &(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT];
 	    
 	    if(y < pow(height, exp) + SEA_LEVEL ){
-	      *block = getBlockType(worldX, y, worldZ, currentBiome);
+
+	      
+	      
 
 	      //try to add a tree
 	      if( y == floor(pow(height, exp)) + SEA_LEVEL){
+		*block = getBlockType(worldX, y, worldZ, currentBiome);
 		if(*block == BLOCK_TYPE_GRASS && pnoise3d(worldX, y, worldZ, 1, 1, 1) / 2 + .5 < 1/100.0){
 
 
@@ -1221,7 +1224,9 @@ void BDinit()
  		      }
 		  treeCount++;
 		}
+
 	      }
+	      
 		
 
 	      /*
@@ -1493,11 +1498,8 @@ blockType getBlockType(wCoordX x, wCoordY y, wCoordZ z, biome b){
   
   switch(b){
   case BIOME_FOREST:
-    if(n < .01){
-      return BLOCK_TYPE_WATER;
-    } else
-    if(n < .02){
-      return BLOCK_TYPE_SAND;
+    if(n < .5){
+      return BLOCK_TYPE_STONE;
     } 
     else
       return BLOCK_TYPE_GRASS;
@@ -1506,7 +1508,7 @@ blockType getBlockType(wCoordX x, wCoordY y, wCoordZ z, biome b){
 
     
   case BIOME_GRASSY:
-    if(n < .01){
+    if(n < .2){
       return BLOCK_TYPE_STONE;
     }  else
       return BLOCK_TYPE_GRASS;
@@ -1536,10 +1538,10 @@ blockType getBlockType(wCoordX x, wCoordY y, wCoordZ z, biome b){
 
 
   case BIOME_ROCKY:
-    if(n < .03){
+    if(n < .3){
       return BLOCK_TYPE_GRASS;
     } else
-    if(n < .10 && n > .8){
+    if(n < .30 && n > .5){
       return BLOCK_TYPE_SOIL;
     } else
       return BLOCK_TYPE_STONE;

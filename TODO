@@ -23,7 +23,7 @@ populate visible			done
 test	 				done
 noiselib				done
 black mountine side- terain config	done
-skybox
+
 
 tag v0.1.1
 
@@ -31,19 +31,18 @@ tag v0.1.1
 opt vbv drawing				done
     display list			done
     vert array				done
-make block type arg of block drawing func		requires tex
-caves	   	       	     	     			
-vertical proximity: bedrock and dirt
-water							requires alpha
-proximity: sand to water
-3d noise internal block type
+make block type arg of block drawing func		done
+water							done
 
 
-
-water
-block types
-trees
+configure and debug curent
+skybox
+caves
+vertical biomes				
+sea
+roll live loading
 move physics
-changes
-items and building
+editing
+
+
 
