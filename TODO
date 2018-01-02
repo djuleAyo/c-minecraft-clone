@@ -33,14 +33,27 @@ opt vbv drawing				done
     vert array				done
 make block type arg of block drawing func		done
 water							done
+<<<<<<< HEAD
+=======
 
+>>>>>>> 1de51a333258dabf0fbf4575c200546c1af576ff
 
+configure and debug curent
+skybox
+caves
+vertical biomes
+3d noise internal block type				
+sea
+
+<<<<<<< HEAD
 configure and debug curent
 skybox
 caves
 vertical biomes				
 sea
 roll live loading
+=======
+>>>>>>> 1de51a333258dabf0fbf4575c200546c1af576ff
 move physics
 editing
 
