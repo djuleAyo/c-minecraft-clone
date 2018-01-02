@@ -19,9 +19,10 @@ typedef enum {
   BLOCK_TYPE_SAND,
   BLOCK_TYPE_STONE,
   BLOCK_TYPE_OAK_WOOD,
-  BLOCK_TYPE_OAT_LEAF,
+  BLOCK_TYPE_OAK_LEAF,
   BLOCK_TYPE_WATER,
-  BLOCK_TYPE_LAVA
+  BLOCK_TYPE_LAVA,
+  BLOCK_TYPE_SNOW,
 } blockType;
 
 typedef enum {
@@ -32,9 +33,11 @@ typedef enum {
   TEX_SAND= 18,
   TEX_OAK_SIDE= 20,
   TEX_OAK_TOP= 21,
-  TEX_OAK_LEAF= 53,
+  TEX_SNOW= 66,
+  TEX_SNOW_SIDE= 68,
+  TEX_OAK_LEAF= 133,
   TEX_WATER= 205,
-  TEX_LAVA= 256,
+  TEX_LAVA= 255,
 } texture;
 
 /* Used for struct timeval from sys/time.h header */
@@ -72,7 +75,6 @@ typedef struct {
 
 #define MAX_HEIGHT 256
 #define CHUNK_DIM 16
-#define SEA_LEVEL 40
 
 typedef blockType chunk[CHUNK_DIM * CHUNK_DIM * MAX_HEIGHT];
 
@@ -93,10 +95,38 @@ typedef struct{
 } VBV;
 
 typedef enum{
-  BIOME_SEA,
+  BIOME_SNOW_TOP,
+  BIOME_SNOWY,
+  BIOME_ROCKY,
   BIOME_FOREST,
-  BIOME_DESERT
+  BIOME_DESERT,
+  BIOME_GRASSY,
 } biome;
+
+#define HUMIDITY_LOW_VAL -.5
+#define HUMIDITY_HIGH_VAL .5
+typedef enum {
+  HUMIDITY_LOW,
+  HUMIDITY_MID,
+  HUMIDITY_HIGH,
+} humidity;
+
+
+#define SEA_LEVEL 64
+//these are ment above sea level not absolute so they are configuraiton free
+#define TERRAIN_HEIGHT_LOW_VAL 10
+#define TERRAIN_HEIGHT_HIGH_VAL 30
+typedef enum {
+  TERRAIN_HEIGHT_LOW,
+  TERRAIN_HEIGHT_MID,
+  TERRAIN_HEIGHT_HIGH
+} terrainHeight;
+
+typedef enum {
+  TERRAIN_TYPE_MOUNT,
+  TERRAIN_TYPE_VALE,
+  TERRAIN_TYPE_HILL
+} terrainType;
 
 #define INITIAL_VBV_VOLUME 256
 
@@ -114,6 +144,7 @@ void VBVprint(VBV *v);
  */
 int isCached(wCoordX x, wCoordY y, wCoordZ z);
 blockType readCacheBlock(wCoordX x, wCoordY y, wCoordZ z);
+void setCacheBlock(wCoordX x, wCoordY y, wCoordZ z, blockType b);
 /* make VBV representation of a chunk */
 void chunkToVBV(wCoordX oX, wCoordY oY, wCoordZ oZ, chunk *c, VBV *v);
 
@@ -151,4 +182,8 @@ void reshape (int w, int h);
 
 
 //BIOMES
-biome getBiome(wCoordX x, wCoordZ z);
+humidity getHumidity(double h);
+terrainType getTerrainType(double e);
+terrainHeight getTerrainHeight(double h);
+biome getBiome(humidity w, terrainHeight h, terrainType g);
+blockType getBlockType(wCoordX x, wCoordY y, wCoordZ z, biome b);

@@ -57,7 +57,7 @@ struct timeval frameEnd;
    effects dimensions of terrain data structures
    effects projection far plane
 */
-int visibility = 15;
+int visibility = 10;
 
 
 chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
@@ -93,14 +93,15 @@ int texCoords[] = {
   //BLOCK_TYPE_WATER,
   TEX_WATER, TEX_WATER, TEX_WATER, TEX_WATER, TEX_WATER, TEX_WATER,
   //BLOCK_TYPE_LAVA
-  TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, 
-
+  TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA,
+  //BLOCK_TYPE_SNOW
+  TEX_SNOW, TEX_SNOW_SIDE, TEX_SNOW_SIDE, TEX_SNOW_SIDE, TEX_SNOW_SIDE, TEX_SNOW_SIDE,
 };
 
 /* display list id*/
 int terrain;
 
-#define tmpLen 10000000
+#define tmpLen 100000000
 GLint *tVerts;
 GLfloat *tTex;
 
@@ -113,6 +114,12 @@ int tTexNum = 0;
 
 int wVertsNum = 0;
 int wTexNum = 0;
+
+#define TREE_MODEL_X 5
+#define TREE_MODEL_Y 7
+#define TREE_MODEL_Z 5
+
+int treeModel [ TREE_MODEL_X * TREE_MODEL_Y * TREE_MODEL_Z];
 
 void VBVtoArrays()
 {
@@ -566,7 +573,7 @@ main (int argc, char **argv)
   bdwo.y = 0;
   bdwo.z = 0;
 
-
+  initTreeModel();
 
   //for since data for both sides of player is kept
   //since aim can be changed fast
@@ -724,6 +731,20 @@ blockType readCacheBlock(wCoordX x, wCoordY y, wCoordZ z)
      + (delta.y) * CHUNK_DIM
      + (delta.z % CHUNK_DIM) * CHUNK_DIM * MAX_HEIGHT];
   
+}
+
+
+void setCacheBlock(wCoordX x, wCoordY y, wCoordZ z, blockType b){
+ worldCoords delta;
+  delta.x = x - bdwo.x;
+  delta.y = y - bdwo.y;
+  delta.z = z - bdwo.z;
+
+ (blockData[(delta.x / CHUNK_DIM) + (delta.z / CHUNK_DIM) * 2 * visibility])
+    [(delta.x % CHUNK_DIM)
+     + (delta.y) * CHUNK_DIM
+     + (delta.z % CHUNK_DIM) * CHUNK_DIM * MAX_HEIGHT] = b;
+ 
 }
 
 /* make VBV representation of a chunk */
@@ -1152,6 +1173,9 @@ void showRefreshRate(int value)
 
 void BDinit()
 {
+
+  int treeCount = 0;
+  
   printf("initing block data\n");
   for(int i = 0; i < 2 * visibility; i++)
     for(int j = 0; j < 2 * visibility; j++)
@@ -1160,33 +1184,123 @@ void BDinit()
 	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
 	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
 
-	  biome b = getBiome(bdwo.x +i * CHUNK_DIM + x,
-			     bdwo.z + j * CHUNK_DIM + z);
+	  int height = (int)(pnoise2d(worldX / 100.0, worldZ/ 100.0,
+					.7, 5, 0) * 20 + 64 );
 	  
+	  double exp = pnoise2d(worldX / 50.0,
+				worldZ / 50.0,
+				.7, 1, 10)  / 2.5 + 2/(float) 5;
+	  terrainType currentTerrainType = getTerrainType(exp);
+	  terrainHeight currentTerrainHeight = getTerrainHeight(pow(height, exp));
+	  
+	  double humidityNoise = pnoise2d(worldX / 100.0, worldZ / 100.0,
+				   .5, 1, 100) ;
+	  humidity currentHumidity = getHumidity(humidityNoise);
 
-	  int height = (int)(pnoise2d(worldX / 300.0, worldZ/ 300.0,
-					.7, 5, 1) * 60 + 64 );
-
-	  double exp = pnoise2d((worldX + 1000) / 50.0,
-				(worldZ + 1000) / 50.0,
-				1, 1, 1)  / 4 + .8;
+	  
+	  biome currentBiome = getBiome(currentHumidity, currentTerrainHeight, currentTerrainType);
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
 	    blockType *block = &(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT];
 	    
-	    if(y < pow(height, exp)){
-	      if(exp < .8)
-		*block = BLOCK_TYPE_WATER;
-	      else if(exp < 1)
-		*block = BLOCK_TYPE_GRASS;
-	      else
+	    if(y < pow(height, exp) + SEA_LEVEL ){
+	      *block = getBlockType(worldX, y, worldZ, currentBiome);
+
+	      //try to add a tree
+	      if( y == floor(pow(height, exp)) + SEA_LEVEL){
+		if(*block == BLOCK_TYPE_GRASS && pnoise3d(worldX, y, worldZ, 1, 1, 1) / 2 + .5 < 1/100.0){
+
+
+		  //if(treeCount < 5)
+		  for(int t_i = 0; t_i < TREE_MODEL_X; t_i++)
+		    for(int t_j = 0; t_j < TREE_MODEL_Y; t_j++)
+		      for(int t_k = 0; t_k < TREE_MODEL_Z; t_k++){
+			if(isCached(worldX + t_i - 2, y + t_j, worldZ + t_k - 2))
+			   setCacheBlock(worldX + t_i - 2, y + t_j + 1, worldZ + t_k - 2,
+					 treeModel[t_i + t_j * TREE_MODEL_X + t_k * TREE_MODEL_X * TREE_MODEL_Z]);
+ 		      }
+		  treeCount++;
+		}
+	      }
+		
+
+	      /*
+	      switch(currentBiome){
+	      case BIOME_SNOW_TOP:
+		*block = BLOCK_TYPE_LAVA;
+		break;
+	      case BIOME_SNOWY:
+		*block = BLOCK_TYPE_SNOW;
+		break;
+	      case BIOME_ROCKY:
 		*block = BLOCK_TYPE_STONE;
+		break;
+	      case BIOME_FOREST:
+		*block = BLOCK_TYPE_OAK_WOOD;
+		break;
+	      case BIOME_GRASSY:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+	      case BIOME_DESERT:
+		*block = BLOCK_TYPE_SAND;
+		break;
+	      }
+	      */
+
+	      /*
+//draw height map
+	      switch(currentTerrainHeight){
+	      case TERRAIN_HEIGHT_LOW:
+		*block = BLOCK_TYPE_WATER;
+		break;
+	      case TERRAIN_HEIGHT_MID:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+	      case TERRAIN_HEIGHT_HIGH:
+		*block = BLOCK_TYPE_STONE;
+		break;
+	      }
+	      */
+	      
+	      
+	      
+	      /*
+	      //draw humidity map
+	      switch(currentHumidity){
+	      case HUMIDITY_LOW:
+		*block = BLOCK_TYPE_SAND;
+		break;
+	      case HUMIDITY_MID:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+	      case HUMIDITY_HIGH:
+		*block = BLOCK_TYPE_WATER;
+		break;
+	      }
+	      */
+
+	      /*
+	      //draw terrainTypeMap
+	      switch(currentTerrainType){
+	      case TERRAIN_TYPE_MOUNT:
+		*block = BLOCK_TYPE_STONE;
+		break;
+	      case TERRAIN_TYPE_HILL:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+	      case TERRAIN_TYPE_VALE:
+		*block = BLOCK_TYPE_SOIL;
+		break;
+	      }
+	      */
+	      
 	    }
-	    else
+	    else if(!(*block))
 	      *block = BLOCK_TYPE_AIR;	
 	  }
 	}
-  printf("block data init finished\n");
+  
+  printf("block data init finished %d\n", treeCount);
 }
 
 void VBDinit()
@@ -1209,6 +1323,249 @@ void VBDinit()
 
 }
 
-biome getBiome(wCoordX x, wCoordZ z){
+terrainHeight getTerrainHeight(double h)
+{
+  if(h < TERRAIN_HEIGHT_LOW_VAL){
+    return TERRAIN_HEIGHT_LOW;
+  } else if(h < TERRAIN_HEIGHT_HIGH_VAL){
+    return TERRAIN_HEIGHT_MID;
+  } else
+    return TERRAIN_HEIGHT_HIGH;
+}
 
+terrainType getTerrainType(double e){
+  if(e < .4)
+    return TERRAIN_TYPE_VALE;
+  if(e < .7)
+    return TERRAIN_TYPE_HILL;
+  return TERRAIN_TYPE_MOUNT;
+}
+humidity getHumidity(double h){
+  if(h < HUMIDITY_LOW_VAL)
+    return HUMIDITY_LOW;
+  if(h < HUMIDITY_HIGH_VAL)
+    return HUMIDITY_MID;
+  return HUMIDITY_HIGH;
+}
+
+biome getBiome(humidity w, terrainHeight h, terrainType g){
+
+  if(h == TERRAIN_HEIGHT_HIGH){
+    
+    if(g == TERRAIN_TYPE_VALE){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_SNOWY;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_GRASSY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_SNOWY;
+	break;
+      }
+    }
+    if(g == TERRAIN_TYPE_HILL){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_ROCKY;	
+	break;
+      case HUMIDITY_MID:
+	return BIOME_SNOWY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_SNOW_TOP;
+	break;
+      }
+    }
+    if(g == TERRAIN_TYPE_MOUNT){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_ROCKY;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_SNOWY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_SNOW_TOP;
+	break;
+      }
+    }
+  }
+
+
+  if(h == TERRAIN_HEIGHT_MID){
+    
+    if(g == TERRAIN_TYPE_VALE){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_DESERT;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_GRASSY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_FOREST;
+	break;
+      }
+    }
+    if(g == TERRAIN_TYPE_HILL){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_DESERT;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_GRASSY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_FOREST;
+	break;
+      }
+    }
+    
+    if(g == TERRAIN_TYPE_MOUNT){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_ROCKY;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_ROCKY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_SNOWY;
+	break;
+      }
+    }
+  }
+
+
+    if(h == TERRAIN_HEIGHT_LOW){
+    
+    if(g == TERRAIN_TYPE_VALE){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_DESERT;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_GRASSY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_FOREST;
+	break;
+      }
+    }
+    if(g == TERRAIN_TYPE_HILL){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_DESERT;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_GRASSY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_FOREST;
+	break;
+      }
+    }
+    if(g == TERRAIN_TYPE_MOUNT){
+      switch(w){
+      case HUMIDITY_LOW:
+	return BIOME_ROCKY;
+	break;
+      case HUMIDITY_MID:
+	return BIOME_GRASSY;
+	break;
+      case HUMIDITY_HIGH:
+	return BIOME_FOREST;
+	break;
+      }
+    }
+  }
+
+  
+}
+
+blockType getBlockType(wCoordX x, wCoordY y, wCoordZ z, biome b){
+
+  double n = pnoise3d(x / 50.0, y / 50.0, z / 50.0,
+		      .7, 1, 10) / 2 + .5 ;
+
+  
+  switch(b){
+  case BIOME_FOREST:
+    if(n < .01){
+      return BLOCK_TYPE_WATER;
+    } else
+    if(n < .02){
+      return BLOCK_TYPE_SAND;
+    } 
+    else
+      return BLOCK_TYPE_GRASS;
+
+    break;
+
+    
+  case BIOME_GRASSY:
+    if(n < .01){
+      return BLOCK_TYPE_STONE;
+    }  else
+      return BLOCK_TYPE_GRASS;
+    break;
+
+
+  case BIOME_DESERT:
+    return BLOCK_TYPE_SAND;
+    break;
+
+
+  case BIOME_SNOW_TOP:
+    return BLOCK_TYPE_SNOW;
+    break;
+
+
+  case BIOME_SNOWY:
+    if(n < .1){
+      return BLOCK_TYPE_GRASS;
+    } else
+    if(n < .5 && n > .4){
+      return BLOCK_TYPE_STONE;
+    } 
+    else
+      return BLOCK_TYPE_SNOW;
+    break;
+
+
+  case BIOME_ROCKY:
+    if(n < .03){
+      return BLOCK_TYPE_GRASS;
+    } else
+    if(n < .10 && n > .8){
+      return BLOCK_TYPE_SOIL;
+    } else
+      return BLOCK_TYPE_STONE;
+    break;
+
+  }
+  
+}
+
+void initTreeModel(){
+  treeModel[2 + 0 * TREE_MODEL_X + 2 * TREE_MODEL_X * TREE_MODEL_Y] = BLOCK_TYPE_OAK_WOOD;
+
+  for(int i = 0; i < TREE_MODEL_X; i++)
+    for(int j = 0; j < TREE_MODEL_Y; j++)
+      for(int k = 0; k < TREE_MODEL_Z; k++){
+        if(j < 3 && k == 2 && i == 2) {
+	  treeModel[i + j * TREE_MODEL_X + k * TREE_MODEL_Z * TREE_MODEL_X] = BLOCK_TYPE_OAK_WOOD;
+	}
+	else if(j >= 3 && j < 5){
+	  
+	  treeModel[i + j * TREE_MODEL_X + k * TREE_MODEL_Z * TREE_MODEL_X] = BLOCK_TYPE_OAK_LEAF;
+	}
+	else if(j >= 5){
+	  if( i > 0 && i < TREE_MODEL_X - 1 && k > 0 && k < TREE_MODEL_Z - 1)
+	    treeModel[i + j * TREE_MODEL_X + k * TREE_MODEL_Z * TREE_MODEL_X] = BLOCK_TYPE_OAK_LEAF;
+	}
+      }
+  
 }
