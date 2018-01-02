@@ -57,7 +57,7 @@ struct timeval frameEnd;
    effects dimensions of terrain data structures
    effects projection far plane
 */
-int visibility = 10;
+int visibility = 15;
 
 
 chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
@@ -1099,7 +1099,7 @@ void passiveMotion (int x, int y)
     return;
   }
   
-  double delta = .01;
+  double delta = .1;
   
   int deltaX = mouseX - x;
   mouseX = x;
@@ -1164,14 +1164,23 @@ void BDinit()
 			     bdwo.z + j * CHUNK_DIM + z);
 	  
 
-	  int surfice = (int)(pnoise2d(worldX / 150.0, worldZ/ 150.0,
-					.5, 5, 1) * 60 + 64 );
+	  int height = (int)(pnoise2d(worldX / 300.0, worldZ/ 300.0,
+					.7, 5, 1) * 60 + 64 );
+
+	  double exp = pnoise2d((worldX + 1000) / 50.0,
+				(worldZ + 1000) / 50.0,
+				1, 1, 1)  / 4 + .8;
 	  
 	  for(int y = 0; y < MAX_HEIGHT; y++){
 	    blockType *block = &(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT];
 	    
-	    if(y < surfice){
-	      *block = BLOCK_TYPE_GRASS;
+	    if(y < pow(height, exp)){
+	      if(exp < .8)
+		*block = BLOCK_TYPE_WATER;
+	      else if(exp < 1)
+		*block = BLOCK_TYPE_GRASS;
+	      else
+		*block = BLOCK_TYPE_STONE;
 	    }
 	    else
 	      *block = BLOCK_TYPE_AIR;	
