@@ -101,12 +101,12 @@ int texCoords[] = {
 /* display list id*/
 int terrain;
 
-#define tmpLen 100000000
-GLint *tVerts;
-GLfloat *tTex;
+#define tmpLen 10000000
+GLint **tVerts;
+GLfloat **tTex;
 
-GLint *wVerts;
-GLfloat *wTex;
+GLint **wVerts;
+GLfloat **wTex;
 
 //terrain
 int tVertsNum = 0;
@@ -115,452 +115,757 @@ int tTexNum = 0;
 int wVertsNum = 0;
 int wTexNum = 0;
 
+//vert stats - 5 ints per chunk in this order: tVertsNum, tTexNum, wVertsNum, wTexNum, isEdited
+int *chunkStats;
+
 #define TREE_MODEL_X 5
 #define TREE_MODEL_Y 7
 #define TREE_MODEL_Z 5
 
 int treeModel [ TREE_MODEL_X * TREE_MODEL_Y * TREE_MODEL_Z];
 
-void VBVtoArrays()
+void VBVtoArray(int i, int j)
 {
-  for(int i = 0; i < 2 * visibility; i++)
-    for(int j = 0; j < 2 * visibility; j++){
-      VBV *v = vbd[i + j * 2 * visibility];
+  VBV *v = vbd[i + j * 2 * visibility];
 
-      for(int k = 0; k < v->length; k++){
-	int *tex = &texCoords[v->data[k].type * 6];
+  GLint *curTVerts = tVerts[i + j * 2 * visibility];
+  GLfloat *curTTex = tTex[i + j * 2 * visibility];
+
+  GLint *curWVerts = wVerts[i + j * 2 * visibility];
+  GLfloat *curWTex = wTex[i + j * 2 * visibility];
+
+  int *curTVertsNum = &chunkStats[(i + j * 2 * visibility) * 5];
+  int *curTTexNum = &chunkStats[(i + j * 2 * visibility) * 5 + 1];
+  int *curWVertsNum = &chunkStats[(i + j * 2 * visibility) * 5 + 2];
+  int *curWTexNum = &chunkStats[(i + j * 2 * visibility) * 5 + 3];
+
+
+  for(int k = 0; k < v->length; k++){
+    int *tex = &texCoords[v->data[k].type * 6];
 	
-	int mask = v->data[k].visibleFaces;
-	int x = v->data[k].coords.x;
-	int y = v->data[k].coords.y;
-	int z = v->data[k].coords.z;
-	
-	if(v->data[k].type != BLOCK_TYPE_WATER){
-	  if(mask & CUBE_FACE_UP) {
+    int mask = v->data[k].visibleFaces;
+    int x = v->data[k].coords.x;
+    int y = v->data[k].coords.y;
+    int z = v->data[k].coords.z;
 
-	    int texX = tex[0] % 16;
-	    int texY = tex[0] / 16;
+    if(v->data[k].type != BLOCK_TYPE_WATER){
+      if(mask & CUBE_FACE_UP) {
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z;
+	int texX = tex[0] % 16;
+	int texY = tex[0] / 16;
+
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
+
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
+
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
-
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z + 1;
-	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
-	  }
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
+      }
   
-	  if(mask & CUBE_FACE_DOWN) {
+      if(mask & CUBE_FACE_DOWN) {
 
-	    int texX = tex[1] % 16;
-	    int texY = tex[1] / 16;
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z;
-	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	int texX = tex[1] % 16;
+	int texY = tex[1] / 16;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z;
-	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
-	  
-	  }
-	  if(mask & CUBE_FACE_WEST) {
-	  
-	    int texX = tex[5] % 16;
-	    int texY = tex[5] / 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
+	  
+      }
+      if(mask & CUBE_FACE_WEST) {
+	  
+	int texX = tex[5] % 16;
+	int texY = tex[5] / 16;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
+
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
+	  
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 	 
-	  }
-	  if(mask & CUBE_FACE_EAST) {
+      }
+      if(mask & CUBE_FACE_EAST) {
 
-	    int texX = tex[3] % 16;
-	    int texY = tex[3] / 16;
+	int texX = tex[3] % 16;
+	int texY = tex[3] / 16;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 	     
-	  }
-	  if(mask & CUBE_FACE_NORTH) {
+      }
+      if(mask & CUBE_FACE_NORTH) {
 
-	    int texX = tex[2] % 16;
-	    int texY = tex[2] / 16;
+	int texX = tex[2] % 16;
+	int texY = tex[2] / 16;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z + 1;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z + 1;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 	 
-	  }
-	  if(mask & CUBE_FACE_SOUTH) {
+      }
+      if(mask & CUBE_FACE_SOUTH) {
 
-	    int texX = tex[4] % 16;
-	    int texY = tex[4] / 16;
+	int texX = tex[4] % 16;
+	int texY = tex[4] / 16;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = (texY + 1) / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = (texY + 1) / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x + 1;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = texX / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = texX / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 
-	    tVerts[tVertsNum++] = x;
-	    tVerts[tVertsNum++] = y + 1;
-	    tVerts[tVertsNum++] = z;
+	curTVerts[*curTVertsNum] = x;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = y + 1;
+	*curTVertsNum += 1;
+	curTVerts[*curTVertsNum] = z;
+	*curTVertsNum += 1;
 	  
-	    tTex[tTexNum++] = (texX + 1) / (float) 16;
-	    tTex[tTexNum++] = texY / (float) 16;
+	curTTex[*curTTexNum] = (texX + 1) / (float) 16;
+	*curTTexNum += 1;
+	curTTex[*curTTexNum] = texY / (float) 16;
+	*curTTexNum += 1;
 	 
-	  }
-	} else {
-	  if(mask & CUBE_FACE_UP) {
+      }
+    } else {
+      if(mask & CUBE_FACE_UP) {
 
-	    int texX = tex[0] % 16;
-	    int texY = tex[0] / 16;
+	int texX = tex[0] % 16;
+	int texY = tex[0] / 16;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
-	  }
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
+      }
   
-	  if(mask & CUBE_FACE_DOWN) {
+      if(mask & CUBE_FACE_DOWN) {
 
-	    int texX = tex[1] % 16;
-	    int texY = tex[1] / 16;
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z;
+	int texX = tex[1] % 16;
+	int texY = tex[1] / 16;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 	  
-	  }
-	  if(mask & CUBE_FACE_WEST) {
+      }
+      if(mask & CUBE_FACE_WEST) {
 	  
-	    int texX = tex[5] % 16;
-	    int texY = tex[5] / 16;
+	int texX = tex[5] % 16;
+	int texY = tex[5] / 16;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 	 
-	  }
-	  if(mask & CUBE_FACE_EAST) {
+      }
+      if(mask & CUBE_FACE_EAST) {
 
-	    int texX = tex[3] % 16;
-	    int texY = tex[3] / 16;
+	int texX = tex[3] % 16;
+	int texY = tex[3] / 16;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 	     
-	  }
-	  if(mask & CUBE_FACE_NORTH) {
+      }
+      if(mask & CUBE_FACE_NORTH) {
 
-	    int texX = tex[2] % 16;
-	    int texY = tex[2] / 16;
+	int texX = tex[2] % 16;
+	int texY = tex[2] / 16;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z + 1;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z + 1;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 	 
-	  }
-	  if(mask & CUBE_FACE_SOUTH) {
+      }
+      if(mask & CUBE_FACE_SOUTH) {
 
-	    int texX = tex[4] % 16;
-	    int texY = tex[4] / 16;
+	int texX = tex[4] % 16;
+	int texY = tex[4] / 16;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = (texY + 1) / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = (texY + 1) / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x + 1;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = texX / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = texX / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 
-	    wVerts[wVertsNum++] = x;
-	    wVerts[wVertsNum++] = y + 1;
-	    wVerts[wVertsNum++] = z;
+	curWVerts[*curWVertsNum] = x;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = y + 1;
+	*curWVertsNum += 1;
+	curWVerts[*curWVertsNum] = z;
+	*curWVertsNum += 1;
 	  
-	    wTex[wTexNum++] = (texX + 1) / (float) 16;
-	    wTex[wTexNum++] = texY / (float) 16;
+	curWTex[*curWTexNum] = (texX + 1) / (float) 16;
+	*curWTexNum += 1;
+	curWTex[*curWTexNum] = texY / (float) 16;
+	*curWTexNum += 1;
 	 
 
-	  }
-	}
-      }   
+      }
     }
+  }
+
+}
+
+void VBDtoArrays()
+{
+  printf("starting arrays init\n");
+  for(int i = 0; i < 2 * visibility; i++){
+    for(int j = 0; j < 2 * visibility; j++){
+      VBVtoArray(i, j);
+    }
+  }
+  printf("ended arrays init\n");
+}
+
+int roofLine = 0;
+
+void drawRoof(){
+  printf("drawroof %d\n", roofLine);
+  for(int i = 0; i < 2 * visibility; i++)
+    for(int j = 0; j < CHUNK_DIM; j++){
+      setCacheBlock(i * CHUNK_DIM + j, 127, roofLine, BLOCK_TYPE_STONE);
+    }
+
+  
+  for(int i = 0; i < 2 * visibility; i++){
+    //here should place over old not reserve new memory
+    free(vbd[i + (roofLine / 16) * 2 * visibility]->data);
+    vbd[i + (roofLine / 16) * 2 * visibility]->data = malloc(sizeof(visibleBlock) * INITIAL_VBV_VOLUME);
+    vbd[i + (roofLine / 16) * 2 * visibility]->volume = INITIAL_VBV_VOLUME;
+    vbd[i + (roofLine / 16) * 2 * visibility]->length = 0;
+    
+    
+    chunkToVBV(i * CHUNK_DIM, 0, roofLine / 16 * CHUNK_DIM,
+	       &blockData[i + (roofLine / 16) * 2 * visibility],
+	       vbd[i + (roofLine / 16) * 2 * visibility]);
+    VBVtoArray(i, roofLine / 16);
+  }
+      
+  glutTimerFunc(1000, drawRoof, 1);
+
+  roofLine++;
+
 }
 
 int
 main (int argc, char **argv)
 {
-  tVerts = malloc(sizeof(int) * tmpLen);
-  tTex = malloc(sizeof(float) * tmpLen);
+  tVerts = malloc(sizeof(int *) * 2 * visibility * 2 * visibility);
+  tTex = malloc(sizeof(float *) * 2 * visibility * 2 * visibility);
   assert(tVerts && tTex);
+  for(int i = 0; i < 4 * pow(visibility, 2); i++){
+    tVerts[i] = malloc(sizeof(int) * tmpLen);
+    tTex[i] = malloc(sizeof(float) * tmpLen);
+    assert(tVerts[i] && tTex[i]);
+  }
 
-  wVerts = malloc(sizeof(int) * tmpLen);
-  wTex = malloc(sizeof(float) * tmpLen);
+  wVerts = malloc(sizeof(int *) * 2 * visibility * 2 * visibility);
+  wTex = malloc(sizeof(float *) * 2 * visibility * 2 * visibility);
   assert(wVerts && wTex);
+  for(int i = 0; i < 4 * pow(visibility, 2); i++){
+    wVerts[i] = malloc(sizeof(int) * tmpLen);
+    wTex[i] = malloc(sizeof(float) * tmpLen);
+    assert(wVerts[i] && wTex[i]);
+  }
 
-
+  chunkStats = calloc(4 * pow(visibility, 2) * 5 , sizeof(int));
+  assert(chunkStats);
   
   pos.x = 0;
   pos.y = 100;
@@ -586,7 +891,7 @@ main (int argc, char **argv)
   
   VBDinit();
   //  VBVprint(vbd[0]);
-  VBVtoArrays();
+  VBDtoArrays();
   printf("finished VBVto arrays\n");
   
   glutInit(&argc, argv);
@@ -616,7 +921,8 @@ main (int argc, char **argv)
   drawVBD();
   glEndList();
 
-  printf("passed the list\n");
+  
+  glutTimerFunc(1000, drawRoof, 1);
   
   glutPassiveMotionFunc(passiveMotion);
   glutReshapeFunc(reshape);
@@ -753,39 +1059,41 @@ void chunkToVBV(wCoordX oX, wCoordY oY, wCoordZ oZ, chunk *c, VBV *v)
   for(int i = 0; i < CHUNK_DIM; i++)
     for(int j = 0; j < MAX_HEIGHT; j++)
       for(int k = 0; k < CHUNK_DIM; k++){
+	//if(j == 127)
+	  //printf("%d ", *c[i + j * CHUNK_DIM + k * CHUNK_DIM * MAX_HEIGHT]);
 	if(!(*c)[i + j * CHUNK_DIM + k * CHUNK_DIM * MAX_HEIGHT]) continue;
 	short faces = 0;
 
 	blockType b = readCacheBlock(oX + i , j, oZ + k);
 	
-	if(!isCached(oX + i  - 1, j, k + oZ)
-	   || (!readCacheBlock(oX + i - 1, j, k + oZ)
-	       || (b!= BLOCK_TYPE_WATER && readCacheBlock(oX + i - 1, j, k + oZ) == BLOCK_TYPE_WATER)))
+	if(isCached(oX + i  - 1, j, k + oZ)
+	   && ((!readCacheBlock(oX + i - 1, j, k + oZ)
+		|| (b!= BLOCK_TYPE_WATER && readCacheBlock(oX + i - 1, j, k + oZ) == BLOCK_TYPE_WATER))))
 	  faces |= CUBE_FACE_WEST;
 	
-	if(!isCached(oX + i  + 1, j, k + oZ)
-	   || (!readCacheBlock(oX + i  + 1, j, k + oZ)
-	       || (b!= BLOCK_TYPE_WATER && readCacheBlock(oX + i  + 1, j, k + oZ) == BLOCK_TYPE_WATER)))
+	if(isCached(oX + i  + 1, j, k + oZ)
+	   && ((!readCacheBlock(oX + i  + 1, j, k + oZ)
+		|| (b!= BLOCK_TYPE_WATER && readCacheBlock(oX + i  + 1, j, k + oZ) == BLOCK_TYPE_WATER))))
 	  faces |= CUBE_FACE_EAST;
 	
-	if(!isCached(i + oX, oY + j - 1, k + oZ)
-	   || (!readCacheBlock(i + oX, oY + j - 1, k + oZ)
-	       || (b!= BLOCK_TYPE_WATER &&readCacheBlock(i + oX, oY + j - 1, k + oZ) == BLOCK_TYPE_WATER)))
+	if(isCached(i + oX, oY + j - 1, k + oZ)
+	   && ((!readCacheBlock(i + oX, oY + j - 1, k + oZ)
+		|| (b!= BLOCK_TYPE_WATER &&readCacheBlock(i + oX, oY + j - 1, k + oZ) == BLOCK_TYPE_WATER))))
 	  faces |= CUBE_FACE_DOWN;
 	
-	if(!isCached(i + oX, j  + 1, k + oZ)
-	    || (!readCacheBlock(i + oX, j + 1, k + oZ)
-		|| (b!= BLOCK_TYPE_WATER &&readCacheBlock(i + oX, j + 1, k + oZ) == BLOCK_TYPE_WATER)))
+	if(isCached(i + oX, j  + 1, k + oZ)
+	   && ((!readCacheBlock(i + oX, j + 1, k + oZ)
+		|| (b!= BLOCK_TYPE_WATER &&readCacheBlock(i + oX, j + 1, k + oZ) == BLOCK_TYPE_WATER))))
 	  faces |= CUBE_FACE_UP;
 	
-	if(!isCached(i + oX, j, oZ + k  - 1)
-	   || (!readCacheBlock(i + oX, j, oZ + k  - 1)
-	       || (b!= BLOCK_TYPE_WATER &&readCacheBlock(i + oX, j, oZ + k  - 1) == BLOCK_TYPE_WATER)))
+	if(isCached(i + oX, j, oZ + k  - 1)
+	   && ((!readCacheBlock(i + oX, j, oZ + k  - 1)
+		|| (b!= BLOCK_TYPE_WATER &&readCacheBlock(i + oX, j, oZ + k  - 1) == BLOCK_TYPE_WATER))))
 	  faces |= CUBE_FACE_SOUTH;
 	
-	if(!isCached(i + oX, j, oZ + k  + 1)
-	   || (!readCacheBlock(i + oX, j, oZ + k  + 1)
-	       || (b!= BLOCK_TYPE_WATER && readCacheBlock(i + oX, j, oZ + k  + 1) == BLOCK_TYPE_WATER)))
+	if(isCached(i + oX, j, oZ + k  + 1)
+	   && ((!readCacheBlock(i + oX, j, oZ + k  + 1)
+		|| (b!= BLOCK_TYPE_WATER && readCacheBlock(i + oX, j, oZ + k  + 1) == BLOCK_TYPE_WATER))))
 	  faces |= CUBE_FACE_NORTH;
 
 	if(faces){
@@ -1057,19 +1365,32 @@ display()
   //glCallList(terrain);
 
 
+  glDisable(GL_BLEND);
+  
   //set terrain for drawing
   glEnableClientState(GL_VERTEX_ARRAY);
   glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-  glVertexPointer(3, GL_INT, 0, tVerts);
-  glTexCoordPointer(2, GL_FLOAT, 0, tTex);
+
+  for(int i = 0; i < 2 * visibility; i++){
+    for(int j = 0; j < 2 * visibility; j++){
+      
+      glVertexPointer(3, GL_INT, 0, tVerts[i + j * 2 * visibility]);
+      glTexCoordPointer(2, GL_FLOAT, 0, tTex[i + j * 2 * visibility]);
+
+      glDrawArrays(GL_QUADS, 0, chunkStats[(i + j * 2 * visibility) * 5] / 3);      
+    }
+  }
 
   //set opacity
-  glDisable(GL_BLEND);
+  
   
   //draw terrain
-  glDrawArrays(GL_QUADS, 0, tVertsNum / 3);
 
+
+
+
+  
 
   //set water for drawing
   glEnableClientState(GL_VERTEX_ARRAY);
@@ -1127,9 +1448,9 @@ void passiveMotion (int x, int y)
   int deltaY = mouseY - y;
   mouseY = y;
 
-  aimFi -= deltaX * delta;
+  aimFi -= deltaX * delta / 10;
   
-  aimTheta += deltaY * delta;
+  aimTheta += deltaY * delta / 10; 
   if(aimTheta > PI/ 2) aimTheta = PI / 2;
   if(aimTheta < - PI / 2) aimTheta = -PI / 2;
 
