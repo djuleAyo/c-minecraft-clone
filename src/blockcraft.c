@@ -10,46 +10,46 @@
 #include "keyStore.h"
 #include "blockcraft.h"
 
-const double PI = 3.14159265;
+static const double PI = 3.14159265;
 
 /* position of camera */
-vec3 pos;
+static vec3 pos;
 
 /* looking direction
    mouse input is added to these angles which are then computed to
    R^3 vector
 */
-double aimFi;
-double aimTheta;
+static double aimFi;
+static double aimTheta;
 
-vec3 aim;
+static vec3 aim;
 
 /* current position of mouse in the window */
-int mouseX;
-int mouseY;
+static int mouseX;
+static int mouseY;
 
 //
-double mouseSensitivity = .5;
+static double mouseSensitivity = .5;
 
 /* window height and width */
-int windowW;
-int windowH;
+static int windowW;
+static int windowH;
 
 /* main game loop is called once for each frame
    if the function executes fast enough fps = rr where rr is refresh
    rate. So to benchmark above rr we compute the time needed for
    game loop execution. given values are in us - milisecs.
 */
-int refreshRate = 0;
-double minFR = 0;
-double maxFR = 0;
-double avrFR = 0;
+static int refreshRate = 0;
+static double minFR = 0;
+static double maxFR = 0;
+static double avrFR = 0;
 
 /*these are used for frame rate computation and for
   animations as current time
 */
-struct timeval frameStart;
-struct timeval frameEnd;
+static struct timeval frameStart;
+static struct timeval frameEnd;
 
 
 
@@ -57,25 +57,25 @@ struct timeval frameEnd;
    effects dimensions of terrain data structures
    effects projection far plane
 */
-int visibility = 10;
+static int visibility = 10;
 
 
-chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
-worldCoords bdwo; // block data world origin
-worldCoords bdmo; // block data memory origin
+static chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
+static worldCoords bdwo; // block data world origin
+static worldCoords bdmo; // block data memory origin
 
 /*visible block data - structure for holding visible blocks - only 
   ones that get drawn
 */
-VBV **vbd; 
+static VBV **vbd; 
 
 /* minecraft texture pack
  */
 static GLuint texPack;
-unsigned texPackW;
-unsigned texPackH;
+static unsigned texPackW;
+static unsigned texPackH;
 
-int texCoords[] = {
+static int texCoords[] = {
   //order: u, d, n, e, s, w
   -1, -1, -1, -1, -1, -1,
   //BLOCK_TYPE_SOIL
@@ -104,11 +104,11 @@ int texCoords[] = {
 int terrain;
 
 #define tmpLen 10000000
-GLint **tVerts;
-GLfloat **tTex;
+static GLint **tVerts;
+static GLfloat **tTex;
 
-GLint **wVerts;
-GLfloat **wTex;
+static GLint **wVerts;
+static GLfloat **wTex;
 
 //terrain
 int tVertsNum = 0;
@@ -124,7 +124,12 @@ int *chunkStats;
 #define TREE_MODEL_Y 7
 #define TREE_MODEL_Z 5
 
-int treeModel [ TREE_MODEL_X * TREE_MODEL_Y * TREE_MODEL_Z];
+static int treeModel [ TREE_MODEL_X * TREE_MODEL_Y * TREE_MODEL_Z];
+
+wCoordX atAimX;
+wCoordY atAimY;
+wCoordZ atAimZ;
+int hasAim;
 
 void VBVtoArray(int i, int j)
 {
@@ -848,6 +853,9 @@ void drawRoof(){
 int
 main (int argc, char **argv)
 {
+
+  hasAim = 0;
+  
   tVerts = malloc(sizeof(int *) * 2 * visibility * 2 * visibility);
   tTex = malloc(sizeof(float *) * 2 * visibility * 2 * visibility);
   assert(tVerts && tTex);
@@ -931,7 +939,7 @@ main (int argc, char **argv)
   glutDisplayFunc(display);
   glutKeyboardFunc(keyboard);
   glutKeyboardUpFunc(keyboardUp);
-  glutTimerFunc(1000, showRefreshRate, 0);
+  //glutTimerFunc(1000, showRefreshRate, 0);
 
   glEnable(GL_DEPTH_TEST);
 
@@ -1360,6 +1368,13 @@ display()
   
   //process user input
   getAimVector();
+  blockType b = vecColide(pos.x, pos.y, pos.z, aim.x, aim.y, aim.z, 3);
+
+  /*if(hasAim) {
+    printf("%d at aim at %d %d %d\n", b, atAimX, atAimY, atAimZ);
+    blockUpdate(atAimX, atAimY, atAimZ, BLOCK_TYPE_AIR);
+  }
+  */
   callActions();
 
   //drawBD();
@@ -1367,6 +1382,26 @@ display()
   //glCallList(terrain);
 
 
+  //check if updates are needed
+  for(int i = 0; i < 2 * visibility; i++)
+    for( int j = 0; j < 2 * visibility; j++){
+      if(chunkStats[(i + j * 2 * visibility) * 5 + 4]){
+	free(vbd[i + j * 2 * visibility]->data);
+	vbd[i + j * 2 * visibility]->data = malloc(sizeof(visibleBlock) * INITIAL_VBV_VOLUME);
+	vbd[i + j * 2 * visibility]->volume = INITIAL_VBV_VOLUME;
+	vbd[i + j * 2 * visibility]->length = 0;
+    
+    
+	chunkToVBV(i * CHUNK_DIM, 0, j * CHUNK_DIM,
+		   &blockData[i + j * 2 * visibility],
+		   vbd[i + j * 2 * visibility]);
+	VBVtoArray(i, j);
+
+	chunkStats[(i + j * 2 * visibility) * 5 + 4] = 0;
+      }
+    }
+
+  
   glDisable(GL_BLEND);
   
   //set terrain for drawing
@@ -1405,10 +1440,13 @@ display()
     }
   }
 
-  
+  if(hasAim) {
+    printf("drawing aim face %d\n", getAimFace);
+    drawAimFace(atAimX, atAimY, atAimZ, getAimFace);
+  }
 
   //draw water
-  glDrawArrays(GL_QUADS, 0, wVertsNum / 3);
+  //  glDrawArrays(GL_QUADS, 0, wVertsNum / 3);
   
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
@@ -1846,6 +1884,122 @@ void initTreeModel(){
 	    treeModel[i + j * TREE_MODEL_X + k * TREE_MODEL_Y * TREE_MODEL_X] = BLOCK_TYPE_OAK_LEAF;
 	}
       }
+  
+}
+
+blockType vecColide(double x, double y, double z, double vecX, double vecY, double vecZ, double range) {
+  double norm = sqrt(vecX * vecX + vecY * vecY + vecZ * vecZ);
+
+  vecX /= norm;
+  vecY /= norm;
+  vecZ /= norm;
+
+  for(int i = 0; i <= range; i++) {
+    blockType b = readCacheBlock( floor( x + i * vecX ),
+				  floor( y + i * vecY ),
+				  floor( z + i * vecZ ));
+    if(b){
+      atAimX = floor( x + i * vecX);
+      atAimY = floor( y + i * vecY);
+      atAimZ = floor( z + i * vecZ);
+      hasAim = 1;
+      return b;
+    }
+  }
+
+  hasAim = 0;
+  return BLOCK_TYPE_AIR;
+}
+
+void blockUpdate(wCoordX x, wCoordY y, wCoordZ z, blockType b) {
+  setCacheBlock(x, y, z, b);
+
+  int deltaX = x - bdwo.x;
+  int deltaZ = z - bdwo.z;
+  chunkStats[(deltaX / 16 + deltaZ / 16 * 2 * visibility) * 5 + 0] = 0;
+  chunkStats[(deltaX / 16 + deltaZ / 16 * 2 * visibility) * 5 + 1] = 0;
+  chunkStats[(deltaX / 16 + deltaZ / 16 * 2 * visibility) * 5 + 2] = 0;
+  chunkStats[(deltaX / 16 + deltaZ / 16 * 2 * visibility) * 5 + 3] = 0;
+  chunkStats[(deltaX / 16 + deltaZ / 16 * 2 * visibility) * 5 + 4] = 1;
+  
+}
+
+cubeFaces getAimFace() {
+  double absX = fabs(aim.x);
+  double absY = fabs(aim.y);
+  double absZ = fabs(aim.z);
+
+  if(absX > absY && absX > absZ){
+    if(aim.x > 0) return CUBE_FACE_WEST;
+    else return CUBE_FACE_EAST;
+  } else if(absY > absX && absY > absZ){
+    if(aim.y > 0) return CUBE_FACE_DOWN;
+    else return CUBE_FACE_UP;
+  } else {
+    if(aim.z > 0) return CUBE_FACE_SOUTH;
+    else return CUBE_FACE_NORTH;
+  }
+}
+void drawAimFace(wCoordX x, wCoordY y, wCoordZ z, cubeFaces f) {
+  glColor3f(.0, .0, .0);
+  glLineWidth(3);
+
+  
+  switch(f) {
+  case CUBE_FACE_UP:
+    glBegin(GL_QUADS);
+    glVertex3f(x, y + 1, z);
+    glVertex3f(x + 1, y + 1, z);
+    glVertex3f(x + 1, y + 1, z + 1);
+    glVertex3f(x, y + 1, z + 1);
+    glEnd();
+    break;
+  case CUBE_FACE_DOWN:
+    glBegin(GL_QUADS);
+    glVertex3f(x, y, z);
+    glVertex3f(x + 1, y, z);
+    glVertex3f(x + 1, y, z + 1);
+    glVertex3f(x, y, z + 1);
+    glEnd();
+    
+    break;
+  case CUBE_FACE_EAST:
+    glBegin(GL_QUADS);
+    glVertex3f(x + 1, y + 1, z);
+    glVertex3f(x + 1, y + 1, z);
+    glVertex3f(x + 1, y + 1, z + 1);
+    glVertex3f(x + 1, y, z + 1);
+    glEnd();
+    
+    break;
+  case CUBE_FACE_WEST:
+    glBegin(GL_QUADS);
+    glVertex3f(x, y + 1, z);
+    glVertex3f(x, y + 1, z);
+    glVertex3f(x, y + 1, z + 1);
+    glVertex3f(x, y, z + 1);
+    glEnd();
+    
+    break;
+  case CUBE_FACE_SOUTH:
+    glBegin(GL_QUADS);
+    glVertex3f(x, y, z);
+    glVertex3f(x + 1, y, z);
+    glVertex3f(x + 1, y + 1, z);
+    glVertex3f(x, y + 1, z);
+    glEnd();
+    
+    break;
+  case CUBE_FACE_NORTH:
+    glBegin(GL_QUADS);
+    glVertex3f(x, y, z + 1);
+    glVertex3f(x + 1, y, z + 1);
+    glVertex3f(x + 1, y + 1, z + 1);
+    glVertex3f(x, y + 1, z + 1);
+    glEnd();
+    
+    break;
+  }
   
 }
 

@@ -188,3 +188,10 @@ terrainType getTerrainType(double e);
 terrainHeight getTerrainHeight(double h);
 biome getBiome(humidity w, terrainHeight h, terrainType g);
 blockType getBlockType(wCoordX x, wCoordY y, wCoordZ z, biome b);
+
+
+blockType vecColide(double x, double y, double z, double vecX, double vecY, double vecZ, double range);
+void blockUpdate(wCoordX x, wCoordY y, wCoordZ z, blockType b);
+
+cubeFaces getAimFace();
+void drawAimFace(wCoordX x, wCoordY y, wCoordZ z, cubeFaces f);
