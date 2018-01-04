@@ -96,6 +96,8 @@ int texCoords[] = {
   TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA, TEX_LAVA,
   //BLOCK_TYPE_SNOW
   TEX_SNOW, TEX_SNOW_SIDE, TEX_SNOW_SIDE, TEX_SNOW_SIDE, TEX_SNOW_SIDE, TEX_SNOW_SIDE,
+  //BLOCK_TYPE_CLOUD
+  TEX_SNOW, TEX_SNOW, TEX_SNOW, TEX_SNOW, TEX_SNOW, TEX_SNOW,
 };
 
 /* display list id*/
@@ -922,7 +924,7 @@ main (int argc, char **argv)
   glEndList();
 
   
-  glutTimerFunc(1000, drawRoof, 1);
+  //glutTimerFunc(1000, drawRoof, 1);
   
   glutPassiveMotionFunc(passiveMotion);
   glutReshapeFunc(reshape);
@@ -1383,12 +1385,8 @@ display()
   }
 
   //set opacity
-  
-  
-  //draw terrain
-
-
-
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_ZERO, GL_SRC_COLOR);
 
   
 
@@ -1396,12 +1394,17 @@ display()
   glEnableClientState(GL_VERTEX_ARRAY);
   glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-  glVertexPointer(3, GL_INT, 0, wVerts);
-  glTexCoordPointer(2, GL_FLOAT, 0, wTex);
 
-  //set opacity
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_ZERO, GL_SRC_COLOR);
+  for(int i = 0; i < 2 * visibility; i++){
+    for(int j = 0; j < 2 * visibility; j++){
+      
+      glVertexPointer(3, GL_INT, 0, wVerts[i + j * 2 * visibility]);
+      glTexCoordPointer(2, GL_FLOAT, 0, wTex[i + j * 2 * visibility]);
+
+      glDrawArrays(GL_QUADS, 0, chunkStats[(i + j * 2 * visibility) * 5 + 2] / 3);      
+    }
+  }
+
   
 
   //draw water
@@ -1513,23 +1516,27 @@ void BDinit()
 				.7, 1, 0)  / 2.5 + 2/(float) 5;
 	  terrainType currentTerrainType = getTerrainType(exp);
 	  terrainHeight currentTerrainHeight = getTerrainHeight(pow(height, exp));
-	  
 	  double humidityNoise = pnoise2d(worldX / 100.0, worldZ / 100.0,
 				   .7, 2, 100) ;
 	  humidity currentHumidity = getHumidity(humidityNoise);
-
 	  double seaMap = pnoise2d(worldX /100.0, worldZ / 100.0,
 				   .7, 5, 0);
-
-	  
+	  double cloudMap = pnoise2d(worldX / 100.0, worldZ / 100.0,
+				     .7, 5, 100);
 	  biome currentBiome = getBiome(currentHumidity, currentTerrainHeight, currentTerrainType);
-	  
-	  for(int y = 0; y < MAX_HEIGHT; y++){
+
+
+
+	  for(int y = 0; y < MAX_HEIGHT; y++) {
 	    blockType *block = &(blockData[i + j * 2 * visibility])[x + y * CHUNK_DIM + z * CHUNK_DIM * MAX_HEIGHT];
 
-	    if(seaMap < 0){
-	      if(y > SEA_LEVEL)
-		*block = BLOCK_TYPE_AIR;
+	    if(seaMap < 0) {
+	      if(y > SEA_LEVEL) {
+		if(y == 127 && cloudMap > .5)
+		  *block = BLOCK_TYPE_CLOUD;
+		else
+		  *block = BLOCK_TYPE_AIR;
+	      }
 	      else if(y <= SEA_LEVEL && y > SEA_LEVEL - pow(height, exp)){
 		*block = BLOCK_TYPE_WATER;
 	      }
@@ -1537,7 +1544,7 @@ void BDinit()
 		*block = BLOCK_TYPE_SAND;
 	    } else {
 
-	      if(y < pow(height, exp) + SEA_LEVEL ){
+	      if(y < pow(height, exp) + SEA_LEVEL ) {
 		*block = BLOCK_TYPE_SOIL;
 
 		//try to add a tree
@@ -1564,83 +1571,15 @@ void BDinit()
 		}
 	          
 	      }
-	      else if(!(*block))
-		*block = BLOCK_TYPE_AIR;
-	    
-		/*
-		  switch(currentBiome){
-		  case BIOME_SNOW_TOP:
-		  *block = BLOCK_TYPE_LAVA;
-		  break;
-		  case BIOME_SNOWY:
-		*block = BLOCK_TYPE_SNOW;
-		break;
-	      case BIOME_ROCKY:
-		*block = BLOCK_TYPE_STONE;
-		break;
-	      case BIOME_FOREST:
-		*block = BLOCK_TYPE_OAK_WOOD;
-		break;
-	      case BIOME_GRASSY:
-		*block = BLOCK_TYPE_GRASS;
-		break;
-	      case BIOME_DESERT:
-		*block = BLOCK_TYPE_SAND;
-		break;
-	      }
-	      */
 
-	      /*
-//draw height map
-	      switch(currentTerrainHeight){
-	      case TERRAIN_HEIGHT_LOW:
-		*block = BLOCK_TYPE_WATER;
-		break;
-	      case TERRAIN_HEIGHT_MID:
-		*block = BLOCK_TYPE_GRASS;
-		break;
-	      case TERRAIN_HEIGHT_HIGH:
-		*block = BLOCK_TYPE_STONE;
-		break;
+	      else if(!(*block)){
+		if(y == 127 && cloudMap > .5)
+		  *block = BLOCK_TYPE_CLOUD;
+		else 
+		  *block = BLOCK_TYPE_AIR;
 	      }
-	      */
-	      
-	      
-	      
-	      /*
-	      //draw humidity map
-	      switch(currentHumidity){
-	      case HUMIDITY_LOW:
-		*block = BLOCK_TYPE_SAND;
-		break;
-	      case HUMIDITY_MID:
-		*block = BLOCK_TYPE_GRASS;
-		break;
-		case HUMIDITY_HIGH:
-		*block = BLOCK_TYPE_WATER;
-		break;
-		}
-	      */
-
-	      /*
-	      //draw terrainTypeMap
-	      switch(currentTerrainType){
-	      case TERRAIN_TYPE_MOUNT:
-	      *block = BLOCK_TYPE_STONE;
-	      break;
-	      case TERRAIN_TYPE_HILL:
-	      *block = BLOCK_TYPE_GRASS;
-	      break;
-	      case TERRAIN_TYPE_VALE:
-	      *block = BLOCK_TYPE_SOIL;
-	      break;
-	      }
-	      */
-	      	
 	    }
 	  }
-  
-	
 	}
   printf("block data init finished \n");
 }
@@ -1909,3 +1848,74 @@ void initTreeModel(){
       }
   
 }
+
+		/*
+		  switch(currentBiome){
+		  case BIOME_SNOW_TOP:
+		  *block = BLOCK_TYPE_LAVA;
+		  break;
+		  case BIOME_SNOWY:
+		*block = BLOCK_TYPE_SNOW;
+		break;
+	      case BIOME_ROCKY:
+		*block = BLOCK_TYPE_STONE;
+		break;
+	      case BIOME_FOREST:
+		*block = BLOCK_TYPE_OAK_WOOD;
+		break;
+	      case BIOME_GRASSY:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+	      case BIOME_DESERT:
+		*block = BLOCK_TYPE_SAND;
+		break;
+	      }
+	      */
+
+	      /*
+//draw height map
+	      switch(currentTerrainHeight){
+	      case TERRAIN_HEIGHT_LOW:
+		*block = BLOCK_TYPE_WATER;
+		break;
+	      case TERRAIN_HEIGHT_MID:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+	      case TERRAIN_HEIGHT_HIGH:
+		*block = BLOCK_TYPE_STONE;
+		break;
+	      }
+	      */
+	      
+	      
+	      
+	      /*
+	      //draw humidity map
+	      switch(currentHumidity){
+	      case HUMIDITY_LOW:
+		*block = BLOCK_TYPE_SAND;
+		break;
+	      case HUMIDITY_MID:
+		*block = BLOCK_TYPE_GRASS;
+		break;
+		case HUMIDITY_HIGH:
+		*block = BLOCK_TYPE_WATER;
+		break;
+		}
+	      */
+
+	      /*
+	      //draw terrainTypeMap
+	      switch(currentTerrainType){
+	      case TERRAIN_TYPE_MOUNT:
+	      *block = BLOCK_TYPE_STONE;
+	      break;
+	      case TERRAIN_TYPE_HILL:
+	      *block = BLOCK_TYPE_GRASS;
+	      break;
+	      case TERRAIN_TYPE_VALE:
+	      *block = BLOCK_TYPE_SOIL;
+	      break;
+	      }
+	      */
+	      	

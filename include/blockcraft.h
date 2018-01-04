@@ -23,6 +23,7 @@ typedef enum {
   BLOCK_TYPE_WATER,
   BLOCK_TYPE_LAVA,
   BLOCK_TYPE_SNOW,
+  BLOCK_TYPE_CLOUD
 } blockType;
 
 typedef enum {
