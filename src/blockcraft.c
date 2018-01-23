@@ -5,11 +5,17 @@
 #include <math.h>
 #include <assert.h>
 
+//library for loading png files into memory
 #include "lodepng.h"
+//library for noise functions - perlin 2d and 3d
 #include "perlin.h"
+//key funtionality is suposed to be seperate from other code - as a module
+//since a header
 #include "keyStore.h"
+//forwards for this file
 #include "blockcraft.h"
 
+//needed for computation of movement and aim vector
 static const double PI = 3.14159265;
 
 /* position of camera */
@@ -17,18 +23,17 @@ static vec3 pos;
 
 /* looking direction
    mouse input is added to these angles which are then computed to
-   R^3 vector
+   R^3 vector named aim
 */
 static double aimFi;
 static double aimTheta;
-
 static vec3 aim;
 
 /* current position of mouse in the window */
 static int mouseX;
 static int mouseY;
 
-//
+//configurable mouse sens.- its parameter
 static double mouseSensitivity = .5;
 
 /* window height and width */
@@ -46,7 +51,7 @@ static double maxFR = 0;
 static double avrFR = 0;
 
 /*these are used for frame rate computation and for
-  animations as current time
+  animations based on time passed
 */
 static struct timeval frameStart;
 static struct timeval frameEnd;
@@ -56,13 +61,20 @@ static struct timeval frameEnd;
 /* measure given in chunks
    effects dimensions of terrain data structures
    effects projection far plane
+   visibility is half of the memory reserved
+   memory is reserved for 2 * visibility square 
+   around player
 */
 static int visibility = 10;
 
 
 static chunk *blockData; // since volume is visibility dependant wich can be changed runtime this must be dynamic
-static worldCoords bdwo; // block data world origin
-static worldCoords bdmo; // block data memory origin
+static worldCoords bdwo; // block data world origin - tells where is first block in block data in the world
+static worldCoords bdmo; // block data memory origin - first block might be on 1st mem positon but might not
+//if not then modulus calculations are used to transform coords in between each
+//all this for live world loading
+//this way we wouldnt rewrite whole data structure on chunk setup change but only 2 rows/colums
+//and update dbmo acordingly
 
 /*visible block data - structure for holding visible blocks - only 
   ones that get drawn
@@ -75,6 +87,8 @@ static GLuint texPack;
 static unsigned texPackW;
 static unsigned texPackH;
 
+//this is container for block faces tex- meaning 1 block can have different faces
+//and it is indexed by blockType enum
 static int texCoords[] = {
   //order: u, d, n, e, s, w
   -1, -1, -1, -1, -1, -1,
@@ -101,38 +115,54 @@ static int texCoords[] = {
 };
 
 /* display list id*/
+//since i tryed different methods for drawing to see which one is most quick there is a display list as well
+//this remains here for systems where this might be faster, but is currently not used
 int terrain;
 
+//arrays that contain vertex coords and tex coords arent realloced-simply not implemented- so lets make sure
+//we have enough mem. if seg fault fault on large visibility - this might be the cause
+//all following arrays use given size
 #define tmpLen 10000000
 static GLint **tVerts;
 static GLfloat **tTex;
-
 static GLint **wVerts;
 static GLfloat **wTex;
 
-//terrain
+//counters for arrays defined above- used by drawing procedures of gl
 int tVertsNum = 0;
 int tTexNum = 0;
-
 int wVertsNum = 0;
 int wTexNum = 0;
 
 //vert stats - 5 ints per chunk in this order: tVertsNum, tTexNum, wVertsNum, wTexNum, isEdited
 int *chunkStats;
 
+//define 3 dimenions for space in which tree is drawn- in blocks
 #define TREE_MODEL_X 5
 #define TREE_MODEL_Y 7
 #define TREE_MODEL_Z 5
 
+//here we will store for now the only three model
 static int treeModel [ TREE_MODEL_X * TREE_MODEL_Y * TREE_MODEL_Z];
 
+//these are coords of block that player is aiming at
 wCoordX atAimX;
 wCoordY atAimY;
 wCoordZ atAimZ;
+//flag if there is any block in given aim range
 int hasAim;
 
+
+//fills vert and tex arrays based on data in VBV
 void VBVtoArray(int i, int j)
 {
+
+  //for every block in VBV for given chunk on i j
+  //copy vert and tex data in apropriate array
+  //check if water or not since water goes in seperate arrays
+  //this is cause of different drawing params
+
+  
   VBV *v = vbd[i + j * 2 * visibility];
 
   GLint *curTVerts = tVerts[i + j * 2 * visibility];
@@ -809,6 +839,7 @@ void VBVtoArray(int i, int j)
 
 }
 
+//copies all data from VBD - all stored VBVs
 void VBDtoArrays()
 {
   printf("starting arrays init\n");
@@ -820,6 +851,8 @@ void VBDtoArrays()
   printf("ended arrays init\n");
 }
 
+
+//this was used in testing of editing block data
 int roofLine = 0;
 
 void drawRoof(){
@@ -853,7 +886,7 @@ void drawRoof(){
 int
 main (int argc, char **argv)
 {
-
+  //set initial value for variables
   hasAim = 0;
   
   tVerts = malloc(sizeof(int *) * 2 * visibility * 2 * visibility);
@@ -890,8 +923,8 @@ main (int argc, char **argv)
 
   initTreeModel();
 
-  //for since data for both sides of player is kept
-  //since aim can be changed fast
+  //four since data for both sides of player is kept
+  //as aim can be changed quickly
   blockData = malloc(sizeof(chunk) * 4 * visibility * visibility);
   assert(blockData);
 
@@ -903,10 +936,12 @@ main (int argc, char **argv)
   //  VBVprint(vbd[0]);
   VBDtoArrays();
   printf("finished VBVto arrays\n");
-  
+
+
+
+  //seting up glut
   glutInit(&argc, argv);
 
-  //set some states
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
   glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
 
@@ -1345,6 +1380,7 @@ void loadTexPack(const char* filename)
   free(image);
 }
 
+//gets num of us needed to finish execution of display func
 void getFR()
 {
   refreshRate++;
@@ -1370,11 +1406,11 @@ display()
   getAimVector();
   blockType b = vecColide(pos.x, pos.y, pos.z, aim.x, aim.y, aim.z, 3);
 
-  /*if(hasAim) {
+  if(hasAim) {
     printf("%d at aim at %d %d %d\n", b, atAimX, atAimY, atAimZ);
     blockUpdate(atAimX, atAimY, atAimZ, BLOCK_TYPE_AIR);
   }
-  */
+  
   callActions();
 
   //drawBD();
@@ -1447,7 +1483,9 @@ display()
 
   //draw water
   //  glDrawArrays(GL_QUADS, 0, wVertsNum / 3);
-  
+
+
+  //camera position
   glLoadIdentity ();          
   gluLookAt (pos.x, pos.y, pos.z,
 	     pos.x + aim.x,
@@ -1483,7 +1521,7 @@ void passiveMotion (int x, int y)
   }
   
   double delta = .1;
-  
+
   int deltaX = mouseX - x;
   mouseX = x;
   int deltaY = mouseY - y;
@@ -1495,6 +1533,7 @@ void passiveMotion (int x, int y)
   if(aimTheta > PI/ 2) aimTheta = PI / 2;
   if(aimTheta < - PI / 2) aimTheta = -PI / 2;
 
+  //stop mouse leaving window
   glutWarpPointer(windowW / 2, windowH / 2);
   
   getAimVector();
@@ -1535,7 +1574,7 @@ void showRefreshRate(int value)
 
 void BDinit()
 {
-
+  //here we make the world
   int treeCount = 0;
   
   printf("initing block data\n");
@@ -1546,21 +1585,31 @@ void BDinit()
 	  int worldX = bdwo.x + x + i * CHUNK_DIM ;
 	  int worldZ = bdwo.z + z + j * CHUNK_DIM;
 
+	  
 	  int height = (int)(pnoise2d(worldX / 30.0, worldZ/ 30.0,
 					.7, 5, 0) * 20 + 64 );
-	  
+	  //this is used to amplify or minify effect of height map - meaning how flat therain is - less of 1 for flater and more for extra non-flat
 	  double exp = pnoise2d(worldX / 50.0,
 				worldZ / 50.0,
 				.7, 1, 0)  / 2.5 + 2/(float) 5;
+	  
 	  terrainType currentTerrainType = getTerrainType(exp);
+	  //both flatness and orignal value of height change final height of terrain - the one that is drawn
 	  terrainHeight currentTerrainHeight = getTerrainHeight(pow(height, exp));
+	  
 	  double humidityNoise = pnoise2d(worldX / 100.0, worldZ / 100.0,
 				   .7, 2, 100) ;
+	  //humidity is used to decide which biome is in given coords
 	  humidity currentHumidity = getHumidity(humidityNoise);
+
+	  //sea map overloads height- meaning where is see height is inverted below sea level
 	  double seaMap = pnoise2d(worldX /100.0, worldZ / 100.0,
 				   .7, 5, 0);
+
+	  //lets use a map for clouds to get a shape
 	  double cloudMap = pnoise2d(worldX / 100.0, worldZ / 100.0,
 				     .7, 5, 100);
+	  //based on humidity, height and flatness choose a biome
 	  biome currentBiome = getBiome(currentHumidity, currentTerrainHeight, currentTerrainType);
 
 
@@ -2003,73 +2052,3 @@ void drawAimFace(wCoordX x, wCoordY y, wCoordZ z, cubeFaces f) {
   
 }
 
-		/*
-		  switch(currentBiome){
-		  case BIOME_SNOW_TOP:
-		  *block = BLOCK_TYPE_LAVA;
-		  break;
-		  case BIOME_SNOWY:
-		*block = BLOCK_TYPE_SNOW;
-		break;
-	      case BIOME_ROCKY:
-		*block = BLOCK_TYPE_STONE;
-		break;
-	      case BIOME_FOREST:
-		*block = BLOCK_TYPE_OAK_WOOD;
-		break;
-	      case BIOME_GRASSY:
-		*block = BLOCK_TYPE_GRASS;
-		break;
-	      case BIOME_DESERT:
-		*block = BLOCK_TYPE_SAND;
-		break;
-	      }
-	      */
-
-	      /*
-//draw height map
-	      switch(currentTerrainHeight){
-	      case TERRAIN_HEIGHT_LOW:
-		*block = BLOCK_TYPE_WATER;
-		break;
-	      case TERRAIN_HEIGHT_MID:
-		*block = BLOCK_TYPE_GRASS;
-		break;
-	      case TERRAIN_HEIGHT_HIGH:
-		*block = BLOCK_TYPE_STONE;
-		break;
-	      }
-	      */
-	      
-	      
-	      
-	      /*
-	      //draw humidity map
-	      switch(currentHumidity){
-	      case HUMIDITY_LOW:
-		*block = BLOCK_TYPE_SAND;
-		break;
-	      case HUMIDITY_MID:
-		*block = BLOCK_TYPE_GRASS;
-		break;
-		case HUMIDITY_HIGH:
-		*block = BLOCK_TYPE_WATER;
-		break;
-		}
-	      */
-
-	      /*
-	      //draw terrainTypeMap
-	      switch(currentTerrainType){
-	      case TERRAIN_TYPE_MOUNT:
-	      *block = BLOCK_TYPE_STONE;
-	      break;
-	      case TERRAIN_TYPE_HILL:
-	      *block = BLOCK_TYPE_GRASS;
-	      break;
-	      case TERRAIN_TYPE_VALE:
-	      *block = BLOCK_TYPE_SOIL;
-	      break;
-	      }
-	      */
-	      	
